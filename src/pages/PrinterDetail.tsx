@@ -1,17 +1,22 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { usePrinters } from '@/context/PrinterContext';
+import { useDataSources } from '@/context/DataSourceContext';
 import { history } from '@/data/mockData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SupplyBar } from '@/components/dashboard/SupplyBar';
-import { ArrowLeft, Wifi, WifiOff, Clock, Hash, Server, MapPin, Cpu } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { WebMapperInline } from '@/components/datasources/WebMapperInline';
+import { ArrowLeft, Wifi, WifiOff, Clock, Hash, Server, MapPin, Cpu, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 export default function PrinterDetail() {
   const { printers, alerts } = usePrinters();
   const { id } = useParams();
+  const [showWebMapper, setShowWebMapper] = useState(false);
   const printer = printers.find(p => p.id === id);
 
   if (!printer) {
@@ -52,10 +57,26 @@ export default function PrinterDetail() {
           <h1 className="text-2xl font-bold">{printer.brand} {printer.model}</h1>
           <p className="text-sm text-muted-foreground font-mono">{printer.ip} — {printer.sector}</p>
         </div>
-        <Badge className={cn("ml-auto", printer.status === 'online' ? 'bg-success text-success-foreground' : printer.status === 'offline' ? 'bg-destructive' : 'bg-warning text-warning-foreground')}>
-          {printer.status === 'online' ? '🟢 Online' : printer.status === 'offline' ? '🔴 Offline' : '🟡 Alerta'}
-        </Badge>
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowWebMapper(true)}>
+            <Globe className="w-3.5 h-3.5 mr-1" /> Mapear via Web
+          </Button>
+          <Badge className={cn(printer.status === 'online' ? 'bg-success text-success-foreground' : printer.status === 'offline' ? 'bg-destructive' : 'bg-warning text-warning-foreground')}>
+            {printer.status === 'online' ? '🟢 Online' : printer.status === 'offline' ? '🔴 Offline' : '🟡 Alerta'}
+          </Badge>
+        </div>
       </div>
+
+      <Dialog open={showWebMapper} onOpenChange={setShowWebMapper}>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Globe className="w-5 h-5" /> Mapear Dados via Web — {printer.brand} {printer.model}
+            </DialogTitle>
+          </DialogHeader>
+          <WebMapperInline printerIp={printer.ip} printerBrand={printer.brand} printerModel={printer.model} onClose={() => setShowWebMapper(false)} />
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {infoItems.map(item => (
