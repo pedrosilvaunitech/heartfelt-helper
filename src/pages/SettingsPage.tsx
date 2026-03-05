@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Printer } from 'lucide-react';
+import { Plus, Trash2, Printer, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 
@@ -211,7 +211,71 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Printer Triggers */}
+      {/* SMTP Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2"><Mail className="w-4 h-4" /> Configuração SMTP</CardTitle>
+          <CardDescription>Configure o servidor de e-mail para envio de alertas por e-mail</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <p className="text-sm font-medium">Alertas por E-mail</p>
+              <p className="text-xs text-muted-foreground">Enviar notificações via e-mail</p>
+            </div>
+            <Switch />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Servidor SMTP</Label>
+              <Input placeholder="smtp.gmail.com" />
+            </div>
+            <div className="space-y-2">
+              <Label>Porta</Label>
+              <Select defaultValue="587">
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="465">465 (SSL)</SelectItem>
+                  <SelectItem value="587">587 (TLS)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Usuário / E-mail</Label>
+              <Input placeholder="alertas@empresa.com" />
+            </div>
+            <div className="space-y-2">
+              <Label>Senha</Label>
+              <Input type="password" placeholder="Senha do SMTP" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>E-mail Remetente</Label>
+              <Input placeholder="noreply@empresa.com" />
+            </div>
+            <div className="space-y-2">
+              <Label>Destinatários (separar por vírgula)</Label>
+              <Input placeholder="admin@empresa.com, ti@empresa.com" />
+            </div>
+          </div>
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <p className="text-sm font-medium">Usar TLS/SSL</p>
+              <p className="text-xs text-muted-foreground">Conexão criptografada</p>
+            </div>
+            <Switch defaultChecked />
+          </div>
+          <Button variant="outline" size="sm" onClick={() => toast({ title: 'E-mail de teste enviado', description: 'Verifique sua caixa de entrada.' })}>
+            <Mail className="w-3.5 h-3.5 mr-1" /> Enviar E-mail de Teste
+          </Button>
+        </CardContent>
+      </Card>
+
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
