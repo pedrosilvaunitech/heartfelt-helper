@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { alerts } from '@/data/mockData';
+import { usePrinters } from '@/context/PrinterContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
 export default function Alerts() {
+  const { alerts } = usePrinters();
   const [severityFilter, setSeverityFilter] = useState('all');
   const [alertState, setAlertState] = useState(alerts);
 

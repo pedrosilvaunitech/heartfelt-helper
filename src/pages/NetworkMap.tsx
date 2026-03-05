@@ -1,4 +1,4 @@
-import { printers } from '@/data/mockData';
+import { usePrinters } from '@/context/PrinterContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
 export default function NetworkMap() {
+  const { printers } = usePrinters();
   const subnets = [...new Set(printers.map(p => p.ip.split('.').slice(0, 3).join('.')))];
 
   return (

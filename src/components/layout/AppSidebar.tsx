@@ -4,12 +4,12 @@ import {
   BarChart3, Settings, Shield, Wrench
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { alerts } from '@/data/mockData';
+import { usePrinters } from '@/context/PrinterContext';
 
-const navItems = [
+const navItemsBase: { to: string; icon: any; label: string; badge?: number }[] = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/printers', icon: Printer, label: 'Impressoras' },
-  { to: '/alerts', icon: Bell, label: 'Alertas', badge: alerts.filter(a => !a.acknowledged).length },
+  { to: '/alerts', icon: Bell, label: 'Alertas' },
   { to: '/network-map', icon: Map, label: 'Mapa de Rede' },
   { to: '/maintenance', icon: Wrench, label: 'Manutenção' },
   { to: '/history', icon: History, label: 'Histórico' },
@@ -24,7 +24,11 @@ const bottomItems = [
 
 export function AppSidebar() {
   const location = useLocation();
-
+  const { alerts } = usePrinters();
+  
+  const navItems = navItemsBase.map(item => 
+    item.to === '/alerts' ? { ...item, badge: alerts.filter(a => !a.acknowledged).length } : item
+  );
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex flex-col">
       <div className="p-6 border-b border-sidebar-border">

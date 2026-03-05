@@ -1,5 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
-import { printers, alerts, history } from '@/data/mockData';
+import { usePrinters } from '@/context/PrinterContext';
+import { history } from '@/data/mockData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 export default function PrinterDetail() {
+  const { printers, alerts } = usePrinters();
   const { id } = useParams();
   const printer = printers.find(p => p.id === id);
 

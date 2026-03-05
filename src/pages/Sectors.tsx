@@ -1,10 +1,23 @@
-import { sectorStats } from '@/data/mockData';
+import { usePrinters } from '@/context/PrinterContext';
+import { alerts as mockAlerts } from '@/data/mockData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Building2, Printer, Wifi, AlertTriangle, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function Sectors() {
+  const { printers, alerts } = usePrinters();
+  const sectors = ['Financeiro', 'RH', 'Produção', 'TI', 'Recepção', 'Diretoria', 'Comercial', 'Logística'];
+  const sectorStats = sectors.map(s => {
+    const sectorPrinters = printers.filter(p => p.sector === s);
+    return {
+      name: s,
+      printerCount: sectorPrinters.length,
+      online: sectorPrinters.filter(p => p.status === 'online').length,
+      alerts: alerts.filter(a => sectorPrinters.some(p => p.id === a.printerId)).length,
+      totalPages: sectorPrinters.reduce((sum, p) => sum + p.pageCount, 0),
+    };
+  });
   return (
     <div className="space-y-6">
       <div>

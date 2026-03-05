@@ -1,4 +1,4 @@
-import { printers } from '@/data/mockData';
+import { usePrinters } from '@/context/PrinterContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,6 +16,7 @@ interface Prediction {
 }
 
 export default function Maintenance() {
+  const { printers } = usePrinters();
   const predictions: Prediction[] = [];
 
   printers.forEach(p => {
