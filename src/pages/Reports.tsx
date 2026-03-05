@@ -1,18 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, PieChart, Pie, Cell } from 'recharts';
-import { printers, monthlyConsumption, sectorStats } from '@/data/mockData';
+import { usePrinters } from '@/context/PrinterContext';
+import { monthlyConsumption } from '@/data/mockData';
 
-const statusData = [
-  { name: 'Online', value: printers.filter(p => p.status === 'online').length, color: 'hsl(var(--success))' },
-  { name: 'Alerta', value: printers.filter(p => p.status === 'warning').length, color: 'hsl(var(--warning))' },
-  { name: 'Offline', value: printers.filter(p => p.status === 'offline').length, color: 'hsl(var(--destructive))' },
-];
-
-const brandData = [...new Set(printers.map(p => p.brand))].map(b => ({
-  brand: b,
-  count: printers.filter(p => p.brand === b).length,
-})).sort((a, b) => b.count - a.count).slice(0, 10);
+const sectors = ['Financeiro', 'RH', 'Produção', 'TI', 'Recepção', 'Diretoria', 'Comercial', 'Logística'];
 
 const chartConfig = {
   pages: { label: 'Páginas', color: 'hsl(var(--primary))' },
@@ -21,6 +13,26 @@ const chartConfig = {
 };
 
 export default function Reports() {
+  const { printers, alerts } = usePrinters();
+
+  const statusData = [
+    { name: 'Online', value: printers.filter(p => p.status === 'online').length, color: 'hsl(var(--success))' },
+    { name: 'Alerta', value: printers.filter(p => p.status === 'warning').length, color: 'hsl(var(--warning))' },
+    { name: 'Offline', value: printers.filter(p => p.status === 'offline').length, color: 'hsl(var(--destructive))' },
+  ];
+
+  const brandData = [...new Set(printers.map(p => p.brand))].map(b => ({
+    brand: b,
+    count: printers.filter(p => p.brand === b).length,
+  })).sort((a, b) => b.count - a.count).slice(0, 10);
+
+  const sectorStats = sectors.map(s => {
+    const sectorPrinters = printers.filter(p => p.sector === s);
+    return {
+      name: s,
+      totalPages: sectorPrinters.reduce((sum, p) => sum + p.pageCount, 0),
+    };
+  });
   return (
     <div className="space-y-6">
       <div>

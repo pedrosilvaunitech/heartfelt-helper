@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { printers } from '@/data/mockData';
+import { usePrinters } from '@/context/PrinterContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -11,14 +11,16 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { SupplyBar } from '@/components/dashboard/SupplyBar';
+import { AddPrinterDialog } from '@/components/printers/AddPrinterDialog';
 
 export default function Printers() {
+  const { printers } = usePrinters();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sectorFilter, setSectorFilter] = useState('all');
   const [view, setView] = useState<'grid' | 'table'>('grid');
 
-  const sectors = useMemo(() => [...new Set(printers.map(p => p.sector))], []);
+  const sectors = useMemo(() => [...new Set(printers.map(p => p.sector))], [printers]);
 
   const filtered = useMemo(() => {
     return printers.filter(p => {
@@ -31,7 +33,7 @@ export default function Printers() {
       const matchSector = sectorFilter === 'all' || p.sector === sectorFilter;
       return matchSearch && matchStatus && matchSector;
     });
-  }, [search, statusFilter, sectorFilter]);
+  }, [printers, search, statusFilter, sectorFilter]);
 
   const statusIcon = (status: string) => {
     if (status === 'online') return <Wifi className="w-3.5 h-3.5 text-success" />;
@@ -41,9 +43,12 @@ export default function Printers() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Impressoras</h1>
-        <p className="text-sm text-muted-foreground mt-1">{filtered.length} de {printers.length} impressoras</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Impressoras</h1>
+          <p className="text-sm text-muted-foreground mt-1">{filtered.length} de {printers.length} impressoras</p>
+        </div>
+        <AddPrinterDialog />
       </div>
 
       <div className="flex flex-wrap gap-3 items-center">

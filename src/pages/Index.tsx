@@ -1,23 +1,16 @@
 import { Printer, Wifi, WifiOff, AlertTriangle, FileText, Wrench } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/StatCard';
-import { printers, alerts, monthlyConsumption, costEstimate } from '@/data/mockData';
+import { usePrinters } from '@/context/PrinterContext';
+import { monthlyConsumption, costEstimate } from '@/data/mockData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SupplyBar } from '@/components/dashboard/SupplyBar';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line } from 'recharts';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 
-const online = printers.filter(p => p.status === 'online').length;
-const offline = printers.filter(p => p.status === 'offline').length;
-const tonerLow = printers.filter(p => p.supplies.some(s => s.type === 'toner' && s.level < 20)).length;
-const paperLow = printers.filter(p => p.supplies.some(s => s.type === 'paper' && s.level < 15)).length;
-const maintenance = printers.filter(p => p.supplies.some(s => (s.type === 'fuser' || s.type === 'drum') && s.level < 15)).length;
-
-const recentAlerts = [...alerts].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 8);
-const criticalPrinters = printers.filter(p => p.supplies.some(s => s.type === 'toner' && s.level < 15)).slice(0, 5);
 
 const chartConfig = {
   pages: { label: 'Páginas', color: 'hsl(var(--primary))' },
@@ -25,6 +18,15 @@ const chartConfig = {
 };
 
 export default function Dashboard() {
+  const { printers, alerts } = usePrinters();
+
+  const online = printers.filter(p => p.status === 'online').length;
+  const offline = printers.filter(p => p.status === 'offline').length;
+  const tonerLow = printers.filter(p => p.supplies.some(s => s.type === 'toner' && s.level < 20)).length;
+  const paperLow = printers.filter(p => p.supplies.some(s => s.type === 'paper' && s.level < 15)).length;
+  const maintenance = printers.filter(p => p.supplies.some(s => (s.type === 'fuser' || s.type === 'drum') && s.level < 15)).length;
+  const recentAlerts = [...alerts].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 8);
+  const criticalPrinters = printers.filter(p => p.supplies.some(s => s.type === 'toner' && s.level < 15)).slice(0, 5);
   return (
     <div className="space-y-8">
       <div>
