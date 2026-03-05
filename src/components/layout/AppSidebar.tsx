@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, Printer, Bell, Map, History, Building2, 
-  BarChart3, Settings, Shield, Wrench
+  BarChart3, Settings, Shield, Wrench, Database
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePrinters } from '@/context/PrinterContext';
@@ -15,6 +15,7 @@ const navItemsBase: { to: string; icon: any; label: string; badge?: number }[] =
   { to: '/history', icon: History, label: 'Histórico' },
   { to: '/sectors', icon: Building2, label: 'Setores' },
   { to: '/reports', icon: BarChart3, label: 'Relatórios' },
+  { to: '/data-sources', icon: Database, label: 'Fontes de Dados' },
 ];
 
 const bottomItems = [
