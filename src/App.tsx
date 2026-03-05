@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PrinterProvider } from "@/context/PrinterContext";
+import { DataSourceProvider } from "@/context/DataSourceContext";
 import Index from "./pages/Index";
 import Printers from "./pages/Printers";
 import PrinterDetail from "./pages/PrinterDetail";
@@ -16,6 +17,7 @@ import Sectors from "./pages/Sectors";
 import Reports from "./pages/Reports";
 import SettingsPage from "./pages/SettingsPage";
 import Users from "./pages/Users";
+import DataSources from "./pages/DataSources";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +26,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <PrinterProvider>
+        <DataSourceProvider>
         <Toaster />
         <Sonner />
         <BrowserRouter>
@@ -40,10 +43,12 @@ const App = () => (
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/users" element={<Users />} />
+              <Route path="/data-sources" element={<DataSources />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        </DataSourceProvider>
       </PrinterProvider>
     </TooltipProvider>
   </QueryClientProvider>
