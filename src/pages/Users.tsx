@@ -222,7 +222,7 @@ export default function UsersPage() {
     fetchAll();
   };
 
-  const roleLabels: Record<string, string> = { admin: 'Administrador', technician: 'Técnico', viewer: 'Visualizador' };
+  const roleLabels: Record<string, string> = { dev: 'Desenvolvedor', admin: 'Administrador', technician: 'Técnico', viewer: 'Visualizador' };
 
   return (
     <div className="space-y-6">
