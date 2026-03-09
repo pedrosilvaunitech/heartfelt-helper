@@ -1,164 +1,218 @@
-# Guia de Instalação Local - PrintGuard Monitor
+# Guia de Instalação - PrintGuard Monitor
 
-## Requisitos
+## Modos de Instalação
 
-- **Linux:** Ubuntu 20.04+ / Debian 11+ / CentOS 8+
-- **Node.js:** v18+
-- **npm:** v9+
-- **Git**
+| Modo | Descrição | Internet |
+|------|-----------|----------|
+| [Cloud](#modo-cloud) | Usa Lovable Cloud como backend | Necessária |
+| [Local Isolado](#modo-local-isolado-docker) | Tudo via Docker, 100% offline | Não |
+| [Desenvolvimento](#modo-desenvolvimento) | Para desenvolver e testar | Depende |
 
 ---
 
-## 1. Preparar o Servidor
+## Modo Cloud
 
-```bash
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y git curl
-```
+Usa o backend Lovable Cloud (padrão do projeto).
 
-## 2. Instalar Node.js
+### Requisitos
+- Node.js v18+
+- npm v9+
 
-```bash
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-source ~/.bashrc
-nvm install 18
-nvm use 18
-```
-
-## 3. Clonar e Instalar
+### Instalação
 
 ```bash
 git clone <URL_DO_REPOSITORIO>
 cd <PASTA_DO_PROJETO>
 npm install
-```
-
-## 4. Configurar Variáveis de Ambiente
-
-Crie o arquivo `.env` na raiz do projeto:
-
-```bash
-nano .env
-```
-
-```env
-# Conexão com backend (Lovable Cloud)
-VITE_SUPABASE_URL=https://hdjpgmcopstbykdaoohm.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkanBnbWNvcHN0YnlrZGFvb2htIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MjEwNTEsImV4cCI6MjA4ODI5NzA1MX0.dIP3A6pwGDRVwKKuyXxi4kceg4H09E_DPSvsXS_R78g
-VITE_SUPABASE_PROJECT_ID=hdjpgmcopstbykdaoohm
-
-# ===== CONFIGURAÇÃO LOCAL =====
-# Porta do servidor de desenvolvimento (mude se 8080 estiver em uso)
-VITE_PORT=3001
-
-# Base path para proxy reverso (deixe "/" se não usar proxy)
-# Para acessar via http://servidor/printers use:
-VITE_BASE_PATH=/printers
-```
-
-Salve com `Ctrl+O`, `Enter`, saia com `Ctrl+X`.
-
----
-
-## 5. Executar em Desenvolvimento
-
-```bash
-# Iniciar na porta configurada (padrão: 3001)
 npm run dev -- --host 0.0.0.0
 ```
 
-Acesse: `http://<IP_DA_VM>:3001/printers`
-
-> **Trocar a porta:** Basta alterar `VITE_PORT` no `.env` e reiniciar.
+Acesse: `http://localhost:8080`
 
 ---
 
-## 6. Compilar para Produção
+## Modo Local Isolado (Docker)
+
+Roda **100% local** — banco de dados, autenticação, edge functions e frontend — sem depender de internet.
+
+### Requisitos
+
+| Recurso | Mínimo |
+|---------|--------|
+| RAM | 4 GB |
+| CPU | 2 cores |
+| Disco | 10 GB |
+| Docker | v20+ |
+| Docker Compose | v2+ |
+| Node.js | v18+ |
+
+### 1. Instalar Docker
 
 ```bash
-npm run build
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+# Faça logout e login novamente
 ```
 
-Os arquivos otimizados serão gerados na pasta `dist/`.
+### 2. Clonar o Projeto
+
+```bash
+git clone <URL_DO_REPOSITORIO>
+cd <PASTA_DO_PROJETO>
+```
+
+### 3. Gerar Chaves de Segurança
+
+```bash
+bash docker/generate-keys.sh > .env.local
+```
+
+Isso gera as chaves JWT (anon e service_role) automaticamente.
+
+### 4. Subir o Backend
+
+```bash
+# Carregar variáveis
+export $(cat .env.local | xargs)
+
+# Subir tudo
+docker compose up -d
+```
+
+Aguarde ~30 segundos para todos os serviços iniciarem.
+
+### 5. Aplicar Migrations
+
+```bash
+# Instalar Supabase CLI
+npm install -g supabase
+
+# Conectar ao banco local
+supabase db reset --db-url "postgresql://postgres:printguard_secret_2024@localhost:54320/postgres"
+```
+
+### 6. Rodar o Frontend
+
+```bash
+# Copiar variáveis do frontend
+cp .env.local .env
+
+npm install
+npm run dev -- --host 0.0.0.0
+```
+
+Acesse: `http://<IP_DO_SERVIDOR>:3001`
+
+### 7. Verificar Serviços
+
+```bash
+docker compose ps
+```
+
+| Serviço | Porta | Função |
+|---------|-------|--------|
+| printguard-db | 54320 | PostgreSQL |
+| printguard-kong | 54321 | API Gateway |
+| printguard-auth | (interna) | Autenticação |
+| printguard-rest | (interna) | API REST |
+| printguard-functions | (interna) | Edge Functions |
+
+### Comandos Úteis
+
+```bash
+docker compose logs -f          # Ver logs
+docker compose restart           # Reiniciar tudo
+docker compose down              # Parar tudo
+docker compose down -v           # Parar e apagar dados
+```
 
 ---
 
-## 7. Servir com Nginx (Proxy Reverso em /printers)
+## Múltiplos Sistemas no Mesmo Servidor
 
-### Instalar Nginx
+Cada sistema roda sua **própria instância** isolada com portas diferentes:
+
+### Exemplo de Portas
+
+| Sistema | DB | API | Frontend |
+|---------|-----|------|----------|
+| PrintGuard | 54320 | 54321 | 3001 |
+| Helpdesk | 54420 | 54421 | 3002 |
+| Inventário | 54520 | 54521 | 3003 |
+
+### Configurar Portas no `.env.local`
+
+```env
+POSTGRES_PORT=54320
+KONG_HTTP_PORT=54321
+VITE_PORT=3001
+```
+
+### Nginx (Proxy Reverso)
 
 ```bash
 sudo apt install -y nginx
+sudo nano /etc/nginx/sites-available/sistemas
 ```
-
-### Copiar arquivos de build
-
-```bash
-sudo mkdir -p /var/www/printers
-sudo cp -r dist/* /var/www/printers/
-```
-
-### Configurar Nginx
-
-```bash
-sudo nano /etc/nginx/sites-available/printers
-```
-
-Cole:
 
 ```nginx
 server {
     listen 80;
     server_name _;
 
-    # Seus outros sistemas podem ficar aqui em outros location blocks
-    # location / { proxy_pass http://127.0.0.1:8080; }
-
-    # PrintGuard em /printers
+    # PrintGuard
     location /printers/ {
-        alias /var/www/printers/;
-        index index.html;
-        try_files $uri $uri/ /printers/index.html;
+        proxy_pass http://127.0.0.1:3001/printers/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
     }
 
-    # Cache de assets
-    location ~* ^/printers/assets/.*\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf)$ {
-        root /var/www/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
+    # Outro sistema
+    location /helpdesk/ {
+        proxy_pass http://127.0.0.1:3002/helpdesk/;
+        proxy_set_header Host $host;
     }
 }
 ```
 
-### Ativar e reiniciar
-
 ```bash
-sudo ln -sf /etc/nginx/sites-available/printers /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/sistemas /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
-sudo nginx -t
-sudo systemctl restart nginx
+sudo nginx -t && sudo systemctl restart nginx
 ```
 
-Acesse: `http://<IP_DA_VM>/printers`
+Para usar subpath, configure no `.env.local`:
+```env
+VITE_BASE_PATH=/printers
+```
 
 ---
 
-## 8. Manter Rodando com PM2 (Modo Dev Persistente)
+## Modo Desenvolvimento
 
-Se preferir rodar em modo de desenvolvimento ao invés de build estático:
+### Rodar com Hot Reload
+
+```bash
+npm run dev -- --host 0.0.0.0
+```
+
+### Compilar para Produção
+
+```bash
+npm run build
+```
+
+Os arquivos são gerados na pasta `dist/`.
+
+### Manter Rodando com PM2
 
 ```bash
 npm install -g pm2
-
-# Iniciar na porta desejada
 pm2 start "npm run dev -- --host 0.0.0.0" --name printguard
-
-# Iniciar no boot
-pm2 startup
-pm2 save
+pm2 startup && pm2 save
 ```
-
-### Comandos PM2
 
 ```bash
 pm2 status              # Ver status
@@ -167,38 +221,15 @@ pm2 restart printguard   # Reiniciar
 pm2 stop printguard      # Parar
 ```
 
-Com PM2, configure o Nginx como proxy reverso:
-
-```nginx
-location /printers/ {
-    proxy_pass http://127.0.0.1:3001/printers/;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-}
-```
-
 ---
 
-## 9. Liberar Firewall
+## Firewall
 
 ```bash
 sudo ufw allow 80
 sudo ufw allow 443
+sudo ufw allow 3001   # Frontend (se acesso direto)
 ```
-
----
-
-## Resumo Rápido
-
-| Ação | Comando |
-|------|---------|
-| Instalar dependências | `npm install` |
-| Rodar em dev | `npm run dev -- --host 0.0.0.0` |
-| Compilar produção | `npm run build` |
-| Trocar porta | Editar `VITE_PORT` no `.env` |
-| Trocar path | Editar `VITE_BASE_PATH` no `.env` e recompilar |
 
 ---
 
@@ -206,8 +237,10 @@ sudo ufw allow 443
 
 | Problema | Solução |
 |----------|---------|
-| Porta em uso | Mudar `VITE_PORT` no `.env` |
+| Porta em uso | Alterar portas no `.env.local` |
+| Docker não inicia | `sudo systemctl start docker` |
+| DB não conecta | `docker compose logs db` |
 | `npm install` falha | `npm install --legacy-peer-deps` |
-| Não acessa de outra máquina | Use `--host 0.0.0.0` e verifique firewall |
-| Página branca no /printers | Verifique se `VITE_BASE_PATH=/printers` e recompile |
-| 404 ao navegar no Nginx | Verifique `try_files` aponta para `/printers/index.html` |
+| Página branca | Verificar `VITE_SUPABASE_URL` aponta para API local |
+| Auth não funciona | Verificar se `ANON_KEY` no `.env` bate com Kong |
+| Migrations falham | Verificar URL do banco: `localhost:54320` |
