@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { usePrinters } from '@/context/PrinterContext';
-import { useDataSources } from '@/context/DataSourceContext';
 import { history } from '@/data/mockData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,15 +8,96 @@ import { Button } from '@/components/ui/button';
 import { SupplyBar } from '@/components/dashboard/SupplyBar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { WebMapperInline } from '@/components/datasources/WebMapperInline';
-import { ArrowLeft, Wifi, WifiOff, Clock, Hash, Server, MapPin, Cpu, Globe } from 'lucide-react';
+import { ArrowLeft, Wifi, WifiOff, Clock, Hash, Server, MapPin, Cpu, Globe, RefreshCw, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 export default function PrinterDetail() {
-  const { printers, alerts } = usePrinters();
+  const { printers, alerts, updatePrinter } = usePrinters();
   const { id } = useParams();
   const [showWebMapper, setShowWebMapper] = useState(false);
+  const [loading, setLoading] = useState(false);
   const printer = printers.find(p => p.id === id);
+
+  const handleRefreshInfo = async () => {
+    if (!printer) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('printer-info', {
+        body: { ip: printer.ip, protocol: 'http' },
+      });
+
+      if (error || data?.error) {
+        // Try HTTPS
+        const { data: data2, error: error2 } = await supabase.functions.invoke('printer-info', {
+          body: { ip: printer.ip, protocol: 'https' },
+        });
+
+        if (error2 || data2?.error) {
+          toast({ title: 'Não foi possível conectar', description: data?.error || data2?.error || 'Impressora não respondeu via HTTP nem HTTPS.', variant: 'destructive' });
+          return;
+        }
+
+        applyInfo(data2.info);
+        return;
+      }
+
+      applyInfo(data.info);
+    } catch {
+      toast({ title: 'Erro', description: 'Falha na consulta.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const applyInfo = (info: any) => {
+    if (!printer || !updatePrinter) return;
+
+    const updates: any = {};
+    if (info.serial) updates.serial = info.serial;
+    if (info.model) updates.model = info.model;
+    if (info.hostname) updates.hostname = info.hostname;
+    if (info.firmware) updates.firmware = info.firmware;
+    if (info.mac) updates.mac = info.mac;
+    if (info.brand) updates.brand = info.brand;
+    if (info.pageCount) updates.pageCount = info.pageCount;
+
+    // Update supply levels if available
+    if (info.tonerBlack !== null || info.tonerCyan !== null) {
+      const supplies = [...printer.supplies];
+      if (info.tonerBlack !== null) {
+        const idx = supplies.findIndex(s => s.name.toLowerCase().includes('black') || s.name.toLowerCase().includes('preto'));
+        if (idx >= 0) supplies[idx] = { ...supplies[idx], level: info.tonerBlack };
+      }
+      if (info.tonerCyan !== null) {
+        const idx = supplies.findIndex(s => s.name.toLowerCase().includes('cyan'));
+        if (idx >= 0) supplies[idx] = { ...supplies[idx], level: info.tonerCyan };
+      }
+      if (info.tonerMagenta !== null) {
+        const idx = supplies.findIndex(s => s.name.toLowerCase().includes('magenta'));
+        if (idx >= 0) supplies[idx] = { ...supplies[idx], level: info.tonerMagenta };
+      }
+      if (info.tonerYellow !== null) {
+        const idx = supplies.findIndex(s => s.name.toLowerCase().includes('yellow') || s.name.toLowerCase().includes('amarelo'));
+        if (idx >= 0) supplies[idx] = { ...supplies[idx], level: info.tonerYellow };
+      }
+      updates.supplies = supplies;
+    }
+
+    updates.lastSeen = new Date().toISOString();
+
+    updatePrinter(printer.id, updates);
+
+    const found = Object.keys(updates).filter(k => k !== 'lastSeen' && k !== 'supplies');
+    toast({
+      title: 'Informações atualizadas',
+      description: found.length > 0
+        ? `Atualizado: ${found.join(', ')}`
+        : 'Níveis de suprimentos atualizados.',
+    });
+  };
 
   if (!printer) {
     return (
@@ -58,6 +138,10 @@ export default function PrinterDetail() {
           <p className="text-sm text-muted-foreground font-mono">{printer.ip} — {printer.sector}</p>
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleRefreshInfo} disabled={loading}>
+            {loading ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+            {loading ? 'Carregando...' : 'Carregar Info'}
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setShowWebMapper(true)}>
             <Globe className="w-3.5 h-3.5 mr-1" /> Mapear via Web
           </Button>

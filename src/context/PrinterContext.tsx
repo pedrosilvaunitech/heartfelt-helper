@@ -6,6 +6,7 @@ interface PrinterContextType {
   printers: Printer[];
   alerts: Alert[];
   addPrinter: (printer: Printer) => void;
+  updatePrinter: (id: string, updates: Partial<Printer>) => void;
   removePrinter: (id: string) => void;
 }
 
@@ -32,13 +33,17 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
     if (newAlerts.length > 0) setAlerts(prev => [...newAlerts, ...prev]);
   };
 
+  const updatePrinter = (id: string, updates: Partial<Printer>) => {
+    setPrinters(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+  };
+
   const removePrinter = (id: string) => {
     setPrinters(prev => prev.filter(p => p.id !== id));
     setAlerts(prev => prev.filter(a => a.printerId !== id));
   };
 
   return (
-    <PrinterContext.Provider value={{ printers, alerts, addPrinter, removePrinter }}>
+    <PrinterContext.Provider value={{ printers, alerts, addPrinter, updatePrinter, removePrinter }}>
       {children}
     </PrinterContext.Provider>
   );
