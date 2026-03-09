@@ -21,6 +21,7 @@ import SettingsPage from "./pages/SettingsPage";
 import Users from "./pages/Users";
 import DataSources from "./pages/DataSources";
 import AuditLog from "./pages/AuditLog";
+import WebMapperPage from "./pages/WebMapperPage";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
@@ -61,6 +62,7 @@ const App = () => (
                   <Route path="/users" element={<PermissionGate pagePath="/users"><Users /></PermissionGate>} />
                   <Route path="/data-sources" element={<PermissionGate pagePath="/data-sources"><DataSources /></PermissionGate>} />
                   <Route path="/audit" element={<PermissionGate pagePath="/audit"><AuditLog /></PermissionGate>} />
+                  <Route path="/web-mapper" element={<PermissionGate pagePath="/data-sources"><WebMapperPage /></PermissionGate>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
