@@ -64,7 +64,7 @@ export default function UsersPage() {
   const { hasRole } = useAuth();
   const { logAction } = useAuditLog();
   const { toast } = useToast();
-  const isAdmin = hasRole('admin');
+  const isAdmin = hasRole('admin') || hasRole('dev');
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -222,7 +222,7 @@ export default function UsersPage() {
     fetchAll();
   };
 
-  const roleLabels: Record<string, string> = { admin: 'Administrador', technician: 'Técnico', viewer: 'Visualizador' };
+  const roleLabels: Record<string, string> = { dev: 'Desenvolvedor', admin: 'Administrador', technician: 'Técnico', viewer: 'Visualizador' };
 
   return (
     <div className="space-y-6">
