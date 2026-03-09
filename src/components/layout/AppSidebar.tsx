@@ -19,6 +19,7 @@ const navItemsBase: { to: string; icon: any; label: string; badge?: number }[] =
   { to: '/sectors', icon: Building2, label: 'Setores' },
   { to: '/reports', icon: BarChart3, label: 'Relatórios' },
   { to: '/data-sources', icon: Database, label: 'Fontes de Dados' },
+  { to: '/web-mapper', icon: MousePointer2, label: 'Mapeamento Web' },
 ];
 
 const bottomItems = [

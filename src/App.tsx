@@ -62,6 +62,7 @@ const App = () => (
                   <Route path="/users" element={<PermissionGate pagePath="/users"><Users /></PermissionGate>} />
                   <Route path="/data-sources" element={<PermissionGate pagePath="/data-sources"><DataSources /></PermissionGate>} />
                   <Route path="/audit" element={<PermissionGate pagePath="/audit"><AuditLog /></PermissionGate>} />
+                  <Route path="/web-mapper" element={<PermissionGate pagePath="/data-sources"><WebMapperPage /></PermissionGate>} />
                 </Route>
                 <Route path="*" element={<NotFound />} />
               </Routes>
