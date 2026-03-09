@@ -1,5 +1,5 @@
-import { useState, createContext, useContext, ReactNode } from 'react';
-import { WebMappingProfile, SNMPProfile, WebMappingPoint, SNMPOIDMapping } from '@/types/dataSources';
+import { useState, createContext, useContext, ReactNode, useCallback } from 'react';
+import { WebMappingProfile, SNMPProfile } from '@/types/dataSources';
 
 // Default SNMP profiles
 const defaultSNMPProfiles: SNMPProfile[] = [
@@ -23,28 +23,15 @@ const defaultSNMPProfiles: SNMPProfile[] = [
     ],
     createdAt: new Date().toISOString(),
   },
-  {
-    id: 'snmp-hp',
-    name: 'HP LaserJet Series',
-    brand: 'HP',
-    model: 'LaserJet',
-    snmpVersion: 'v2c',
-    community: 'public',
-    oidMappings: [
-      { id: 'hp-1', name: 'Toner Black Level', oid: '1.3.6.1.2.1.43.11.1.1.9.1.1', description: 'Black toner remaining', category: 'supply', valueType: 'percentage', alertThreshold: 20, alertCondition: '<' },
-      { id: 'hp-2', name: 'Toner Cyan Level', oid: '1.3.6.1.2.1.43.11.1.1.9.1.2', description: 'Cyan toner remaining', category: 'supply', valueType: 'percentage', alertThreshold: 20, alertCondition: '<' },
-      { id: 'hp-3', name: 'Toner Magenta Level', oid: '1.3.6.1.2.1.43.11.1.1.9.1.3', description: 'Magenta toner remaining', category: 'supply', valueType: 'percentage', alertThreshold: 20, alertCondition: '<' },
-      { id: 'hp-4', name: 'Toner Yellow Level', oid: '1.3.6.1.2.1.43.11.1.1.9.1.4', description: 'Yellow toner remaining', category: 'supply', valueType: 'percentage', alertThreshold: 20, alertCondition: '<' },
-      { id: 'hp-5', name: 'Total Pages Printed', oid: '1.3.6.1.2.1.43.10.2.1.4.1.1', description: 'Lifetime page count', category: 'counter', valueType: 'integer' },
-      { id: 'hp-6', name: 'Printer Status', oid: '1.3.6.1.4.1.11.2.3.9.1.1.3.0', description: 'HP specific status', category: 'status', valueType: 'integer' },
-      { id: 'hp-7', name: 'Fuser Kit Life', oid: '1.3.6.1.2.1.43.11.1.1.9.1.5', description: 'Fuser remaining life', category: 'supply', valueType: 'percentage', alertThreshold: 10, alertCondition: '<' },
-      { id: 'hp-8', name: 'Maintenance Kit', oid: '1.3.6.1.2.1.43.11.1.1.9.1.6', description: 'Maintenance kit remaining', category: 'supply', valueType: 'percentage', alertThreshold: 10, alertCondition: '<' },
-      { id: 'hp-9', name: 'Paper Tray 1', oid: '1.3.6.1.2.1.43.8.2.1.10.1.1', description: 'Tray 1 level', category: 'supply', valueType: 'percentage', alertThreshold: 15, alertCondition: '<' },
-      { id: 'hp-10', name: 'Paper Tray 2', oid: '1.3.6.1.2.1.43.8.2.1.10.1.2', description: 'Tray 2 level', category: 'supply', valueType: 'percentage', alertThreshold: 15, alertCondition: '<' },
-    ],
-    createdAt: new Date().toISOString(),
-  },
 ];
+
+export interface DataSourceExport {
+  version: string;
+  exportDate: string;
+  description?: string;
+  snmpProfiles: SNMPProfile[];
+  webProfiles: WebMappingProfile[];
+}
 
 interface DataSourceContextType {
   snmpProfiles: SNMPProfile[];
@@ -55,6 +42,8 @@ interface DataSourceContextType {
   addWebProfile: (profile: WebMappingProfile) => void;
   updateWebProfile: (id: string, profile: Partial<WebMappingProfile>) => void;
   removeWebProfile: (id: string) => void;
+  importProfiles: (data: DataSourceExport) => { snmpAdded: number; webAdded: number; snmpSkipped: number; webSkipped: number };
+  exportProfiles: () => DataSourceExport;
 }
 
 const DataSourceContext = createContext<DataSourceContextType | null>(null);
@@ -70,11 +59,54 @@ export function DataSourceProvider({ children }: { children: ReactNode }) {
   const updateWebProfile = (id: string, updates: Partial<WebMappingProfile>) => setWebProfiles(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
   const removeWebProfile = (id: string) => setWebProfiles(prev => prev.filter(p => p.id !== id));
 
+  const importProfiles = useCallback((data: DataSourceExport) => {
+    let snmpAdded = 0, webAdded = 0, snmpSkipped = 0, webSkipped = 0;
+
+    if (data.snmpProfiles) {
+      data.snmpProfiles.forEach(profile => {
+        setSNMPProfiles(prev => {
+          if (prev.some(p => p.id === profile.id)) {
+            snmpSkipped++;
+            return prev;
+          }
+          snmpAdded++;
+          return [...prev, profile];
+        });
+      });
+    }
+
+    if (data.webProfiles) {
+      data.webProfiles.forEach(profile => {
+        setWebProfiles(prev => {
+          if (prev.some(p => p.id === profile.id)) {
+            webSkipped++;
+            return prev;
+          }
+          webAdded++;
+          return [...prev, profile];
+        });
+      });
+    }
+
+    return { snmpAdded, webAdded, snmpSkipped, webSkipped };
+  }, []);
+
+  const exportProfiles = useCallback((): DataSourceExport => {
+    return {
+      version: '1.0',
+      exportDate: new Date().toISOString(),
+      description: 'PrintGuard - Exportação de fontes de dados',
+      snmpProfiles,
+      webProfiles,
+    };
+  }, [snmpProfiles, webProfiles]);
+
   return (
     <DataSourceContext.Provider value={{
       snmpProfiles, webProfiles,
       addSNMPProfile, updateSNMPProfile, removeSNMPProfile,
       addWebProfile, updateWebProfile, removeWebProfile,
+      importProfiles, exportProfiles,
     }}>
       {children}
     </DataSourceContext.Provider>
