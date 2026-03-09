@@ -29,7 +29,7 @@ const App = () => (
         <DataSourceProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.VITE_BASE_PATH || "/"}>
           <Routes>
             <Route element={<AppLayout />}>
               <Route path="/" element={<Index />} />
