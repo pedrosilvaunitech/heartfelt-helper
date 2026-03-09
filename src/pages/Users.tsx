@@ -64,7 +64,7 @@ export default function UsersPage() {
   const { hasRole } = useAuth();
   const { logAction } = useAuditLog();
   const { toast } = useToast();
-  const isAdmin = hasRole('admin');
+  const isAdmin = hasRole('admin') || hasRole('dev');
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
