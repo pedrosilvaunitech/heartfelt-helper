@@ -6,6 +6,7 @@ interface PrinterContextType {
   printers: Printer[];
   alerts: Alert[];
   addPrinter: (printer: Printer) => void;
+  updatePrinter: (id: string, updates: Partial<Printer>) => void;
   removePrinter: (id: string) => void;
 }
 
