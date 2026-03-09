@@ -21,6 +21,7 @@ import SettingsPage from "./pages/SettingsPage";
 import Users from "./pages/Users";
 import DataSources from "./pages/DataSources";
 import AuditLog from "./pages/AuditLog";
+import WebMapperPage from "./pages/WebMapperPage";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import NotFound from "./pages/NotFound";
