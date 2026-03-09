@@ -1,108 +1,89 @@
-# Guia de Instalação - Sistema de Monitoramento de Impressoras
+# Guia de Instalação Local - PrintGuard Monitor
 
-## Requisitos do Sistema
+## Requisitos
 
-- **Sistema Operacional:** Ubuntu 20.04+ / Debian 11+ / CentOS 8+ ou qualquer distro Linux moderna
-- **Node.js:** v18 ou superior
-- **npm:** v9 ou superior
-- **Git:** instalado
+- **Linux:** Ubuntu 20.04+ / Debian 11+ / CentOS 8+
+- **Node.js:** v18+
+- **npm:** v9+
+- **Git**
 
 ---
 
-## Passo 1: Atualizar o sistema
+## 1. Preparar o Servidor
 
 ```bash
 sudo apt update && sudo apt upgrade -y
+sudo apt install -y git curl
 ```
 
-## Passo 2: Instalar o Node.js (via NVM - recomendado)
+## 2. Instalar Node.js
 
 ```bash
-# Instalar NVM
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-
-# Recarregar o terminal
 source ~/.bashrc
-
-# Instalar Node.js 18 LTS
 nvm install 18
 nvm use 18
-
-# Verificar instalação
-node -v
-npm -v
 ```
 
-### Alternativa: Instalar Node.js via apt (Ubuntu/Debian)
+## 3. Clonar e Instalar
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt install -y nodejs
-```
-
-## Passo 3: Instalar o Git
-
-```bash
-sudo apt install -y git
-```
-
-## Passo 4: Clonar o repositório
-
-```bash
-git clone <URL_DO_SEU_REPOSITORIO>
-cd <NOME_DA_PASTA_DO_PROJETO>
-```
-
-> **Dica:** Para obter a URL do repositório, vá em Settings → GitHub no Lovable e conecte ao GitHub primeiro.
-
-## Passo 5: Instalar as dependências
-
-```bash
+git clone <URL_DO_REPOSITORIO>
+cd <PASTA_DO_PROJETO>
 npm install
 ```
 
-## Passo 6: Configurar variáveis de ambiente
+## 4. Configurar Variáveis de Ambiente
 
-Crie um arquivo `.env` na raiz do projeto:
+Crie o arquivo `.env` na raiz do projeto:
 
 ```bash
 nano .env
 ```
 
-Adicione o seguinte conteúdo:
-
 ```env
+# Conexão com backend (Lovable Cloud)
 VITE_SUPABASE_URL=https://hdjpgmcopstbykdaoohm.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhkanBnbWNvcHN0YnlrZGFvb2htIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MjEwNTEsImV4cCI6MjA4ODI5NzA1MX0.dIP3A6pwGDRVwKKuyXxi4kceg4H09E_DPSvsXS_R78g
 VITE_SUPABASE_PROJECT_ID=hdjpgmcopstbykdaoohm
+
+# ===== CONFIGURAÇÃO LOCAL =====
+# Porta do servidor de desenvolvimento (mude se 8080 estiver em uso)
+VITE_PORT=3001
+
+# Base path para proxy reverso (deixe "/" se não usar proxy)
+# Para acessar via http://servidor/printers use:
+VITE_BASE_PATH=/printers
 ```
 
-Salve com `Ctrl+O`, `Enter`, e saia com `Ctrl+X`.
+Salve com `Ctrl+O`, `Enter`, saia com `Ctrl+X`.
 
-## Passo 7: Executar em modo de desenvolvimento
+---
+
+## 5. Executar em Desenvolvimento
 
 ```bash
-npm run dev
+# Iniciar na porta configurada (padrão: 3001)
+npm run dev -- --host 0.0.0.0
 ```
 
-O servidor vai iniciar em `http://localhost:5173`. Acesse pelo navegador.
+Acesse: `http://<IP_DA_VM>:3001/printers`
 
-> **Nota:** Para acessar de outra máquina na rede, use:
-> ```bash
-> npm run dev -- --host 0.0.0.0
-> ```
-> E acesse via `http://<IP_DA_VM>:5173`
+> **Trocar a porta:** Basta alterar `VITE_PORT` no `.env` e reiniciar.
 
-## Passo 8: Build para produção (opcional)
+---
+
+## 6. Compilar para Produção
 
 ```bash
-# Gerar os arquivos otimizados
 npm run build
-
-# Os arquivos ficarão na pasta 'dist/'
 ```
 
-## Passo 9: Servir em produção com Nginx (opcional)
+Os arquivos otimizados serão gerados na pasta `dist/`.
+
+---
+
+## 7. Servir com Nginx (Proxy Reverso em /printers)
 
 ### Instalar Nginx
 
@@ -110,74 +91,114 @@ npm run build
 sudo apt install -y nginx
 ```
 
-### Configurar o Nginx
+### Copiar arquivos de build
 
 ```bash
-sudo nano /etc/nginx/sites-available/impressoras
+sudo mkdir -p /var/www/printers
+sudo cp -r dist/* /var/www/printers/
 ```
 
-Cole o seguinte:
+### Configurar Nginx
+
+```bash
+sudo nano /etc/nginx/sites-available/printers
+```
+
+Cole:
 
 ```nginx
 server {
     listen 80;
     server_name _;
 
-    root /caminho/para/seu/projeto/dist;
-    index index.html;
+    # Seus outros sistemas podem ficar aqui em outros location blocks
+    # location / { proxy_pass http://127.0.0.1:8080; }
 
-    location / {
-        try_files $uri $uri/ /index.html;
+    # PrintGuard em /printers
+    location /printers/ {
+        alias /var/www/printers/;
+        index index.html;
+        try_files $uri $uri/ /printers/index.html;
     }
 
-    # Cache de assets estáticos
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf)$ {
+    # Cache de assets
+    location ~* ^/printers/assets/.*\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf)$ {
+        root /var/www/;
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
 }
 ```
 
-### Ativar o site e reiniciar Nginx
+### Ativar e reiniciar
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/impressoras /etc/nginx/sites-enabled/
-sudo rm /etc/nginx/sites-enabled/default
+sudo ln -sf /etc/nginx/sites-available/printers /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t
 sudo systemctl restart nginx
 ```
 
-### Liberar porta no firewall (se necessário)
+Acesse: `http://<IP_DA_VM>/printers`
+
+---
+
+## 8. Manter Rodando com PM2 (Modo Dev Persistente)
+
+Se preferir rodar em modo de desenvolvimento ao invés de build estático:
+
+```bash
+npm install -g pm2
+
+# Iniciar na porta desejada
+pm2 start "npm run dev -- --host 0.0.0.0" --name printguard
+
+# Iniciar no boot
+pm2 startup
+pm2 save
+```
+
+### Comandos PM2
+
+```bash
+pm2 status              # Ver status
+pm2 logs printguard      # Ver logs
+pm2 restart printguard   # Reiniciar
+pm2 stop printguard      # Parar
+```
+
+Com PM2, configure o Nginx como proxy reverso:
+
+```nginx
+location /printers/ {
+    proxy_pass http://127.0.0.1:3001/printers/;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+}
+```
+
+---
+
+## 9. Liberar Firewall
 
 ```bash
 sudo ufw allow 80
 sudo ufw allow 443
 ```
 
-## Passo 10: Executar como serviço com PM2 (alternativa ao Nginx)
+---
 
-Se preferir manter o servidor de desenvolvimento rodando:
+## Resumo Rápido
 
-```bash
-# Instalar PM2
-npm install -g pm2
-
-# Iniciar o app
-pm2 start "npm run dev -- --host 0.0.0.0" --name impressoras
-
-# Salvar para iniciar automaticamente no boot
-pm2 startup
-pm2 save
-```
-
-### Comandos úteis do PM2
-
-```bash
-pm2 status          # Ver status
-pm2 logs impressoras # Ver logs
-pm2 restart impressoras # Reiniciar
-pm2 stop impressoras    # Parar
-```
+| Ação | Comando |
+|------|---------|
+| Instalar dependências | `npm install` |
+| Rodar em dev | `npm run dev -- --host 0.0.0.0` |
+| Compilar produção | `npm run build` |
+| Trocar porta | Editar `VITE_PORT` no `.env` |
+| Trocar path | Editar `VITE_BASE_PATH` no `.env` e recompilar |
 
 ---
 
@@ -185,27 +206,8 @@ pm2 stop impressoras    # Parar
 
 | Problema | Solução |
 |----------|---------|
-| `npm install` falha | Tente `npm install --legacy-peer-deps` |
-| Porta 5173 em uso | Use `npm run dev -- --port 3000` |
-| Não acessa de outra máquina | Use `--host 0.0.0.0` e verifique o firewall |
-| Erro de permissão | Use `sudo` ou corrija permissões da pasta |
-| Node.js muito antigo | Atualize com `nvm install 18` |
-
----
-
-## Estrutura do Projeto
-
-```
-├── src/                  # Código fonte
-│   ├── components/       # Componentes React
-│   ├── pages/            # Páginas da aplicação
-│   ├── context/          # Contextos React (estado global)
-│   ├── data/             # Dados mock
-│   ├── types/            # Tipos TypeScript
-│   └── hooks/            # Hooks customizados
-├── supabase/
-│   └── functions/        # Edge Functions (backend)
-├── public/               # Arquivos estáticos
-├── package.json          # Dependências
-└── .env                  # Variáveis de ambiente
-```
+| Porta em uso | Mudar `VITE_PORT` no `.env` |
+| `npm install` falha | `npm install --legacy-peer-deps` |
+| Não acessa de outra máquina | Use `--host 0.0.0.0` e verifique firewall |
+| Página branca no /printers | Verifique se `VITE_BASE_PATH=/printers` e recompile |
+| 404 ao navegar no Nginx | Verifique `try_files` aponta para `/printers/index.html` |
