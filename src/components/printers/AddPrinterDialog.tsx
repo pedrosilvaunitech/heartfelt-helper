@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus } from 'lucide-react';
+import { Plus, Download, Loader2 } from 'lucide-react';
 import { usePrinters } from '@/context/PrinterContext';
 import { Printer, Supply } from '@/types/printer';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const brands = ['HP', 'Brother', 'Epson', 'Canon', 'Samsung', 'Xerox', 'Ricoh', 'Lexmark', 'Kyocera', 'Sharp', 'Konica Minolta', 'Pantum', 'Zebra', 'Elgin', 'Bematech', 'Tanca'];
 const sectors = ['Financeiro', 'RH', 'Produção', 'TI', 'Recepção', 'Diretoria', 'Comercial', 'Logística'];
@@ -15,6 +16,8 @@ const sectors = ['Financeiro', 'RH', 'Produção', 'TI', 'Recepção', 'Diretori
 export function AddPrinterDialog() {
   const { addPrinter } = usePrinters();
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [protocol, setProtocol] = useState<'http' | 'https'>('http');
   const [form, setForm] = useState({
     ip: '',
     hostname: '',
@@ -29,6 +32,47 @@ export function AddPrinterDialog() {
   });
 
   const update = (key: string, value: string | boolean) => setForm(prev => ({ ...prev, [key]: value }));
+
+  const handleLoadInfo = async () => {
+    if (!form.ip) {
+      toast({ title: 'IP obrigatório', description: 'Informe o IP da impressora para carregar as informações.', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('printer-info', {
+        body: { ip: form.ip, protocol },
+      });
+
+      if (error || data?.error) {
+        toast({ title: 'Erro ao consultar', description: data?.error || error?.message || 'Impressora não respondeu.', variant: 'destructive' });
+        return;
+      }
+
+      const info = data.info;
+      setForm(prev => ({
+        ...prev,
+        serial: info.serial || prev.serial,
+        model: info.model || prev.model,
+        hostname: info.hostname || prev.hostname,
+        firmware: info.firmware || prev.firmware,
+        mac: info.mac || prev.mac,
+        brand: info.brand && brands.includes(info.brand) ? info.brand : prev.brand,
+        isColor: !!(info.tonerCyan || info.tonerMagenta || info.tonerYellow) || prev.isColor,
+      }));
+
+      const found = [info.serial && 'Serial', info.model && 'Modelo', info.brand && 'Marca', info.firmware && 'Firmware', info.mac && 'MAC'].filter(Boolean);
+      toast({
+        title: `${found.length} informações encontradas`,
+        description: found.length > 0 ? `Carregado: ${found.join(', ')}` : 'Nenhuma informação reconhecida. Tente o mapeamento web.',
+      });
+    } catch (err) {
+      toast({ title: 'Erro de conexão', description: 'Não foi possível acessar a função de consulta.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = () => {
     if (!form.ip || !form.brand || !form.model || !form.sector) {
@@ -90,18 +134,33 @@ export function AddPrinterDialog() {
           <DialogTitle>Adicionar Impressora</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-2">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">IP *</Label>
-              <Input placeholder="192.168.1.100" value={form.ip} onChange={e => update('ip', e.target.value)} className="font-mono" />
+          {/* IP + Load button */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">IP da Impressora *</Label>
+            <div className="flex gap-2">
+              <Select value={protocol} onValueChange={(v: 'http' | 'https') => setProtocol(v)}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="http">HTTP</SelectItem>
+                  <SelectItem value="https">HTTPS</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input placeholder="192.168.1.100" value={form.ip} onChange={e => update('ip', e.target.value)} className="font-mono flex-1" />
+              <Button type="button" variant="secondary" size="sm" onClick={handleLoadInfo} disabled={loading || !form.ip} className="whitespace-nowrap">
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 mr-1" />}
+                {loading ? 'Buscando...' : 'Carregar Info'}
+              </Button>
             </div>
+            <p className="text-[10px] text-muted-foreground">Digite o IP e clique em "Carregar Info" para preencher automaticamente</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Hostname</Label>
               <Input placeholder="printer-01" value={form.hostname} onChange={e => update('hostname', e.target.value)} />
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Marca *</Label>
               <Select value={form.brand} onValueChange={v => update('brand', v)}>
@@ -111,28 +170,31 @@ export function AddPrinterDialog() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Modelo *</Label>
               <Input placeholder="LaserJet M404" value={form.model} onChange={e => update('model', e.target.value)} />
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Serial</Label>
               <Input placeholder="SN123456A" value={form.serial} onChange={e => update('serial', e.target.value)} className="font-mono" />
             </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Firmware</Label>
-              <Input placeholder="1.0.0" value={form.firmware} onChange={e => update('firmware', e.target.value)} className="font-mono" />
-            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
+              <Label className="text-xs">Firmware</Label>
+              <Input placeholder="1.0.0" value={form.firmware} onChange={e => update('firmware', e.target.value)} className="font-mono" />
+            </div>
+            <div className="space-y-1.5">
               <Label className="text-xs">MAC</Label>
               <Input placeholder="AA:BB:CC:DD:EE:FF" value={form.mac} onChange={e => update('mac', e.target.value)} className="font-mono" />
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs">Setor *</Label>
               <Select value={form.sector} onValueChange={v => update('sector', v)}>
@@ -142,11 +204,10 @@ export function AddPrinterDialog() {
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Localização</Label>
-            <Input placeholder="Andar 2, Sala 201" value={form.location} onChange={e => update('location', e.target.value)} />
+            <div className="space-y-1.5">
+              <Label className="text-xs">Localização</Label>
+              <Input placeholder="Andar 2, Sala 201" value={form.location} onChange={e => update('location', e.target.value)} />
+            </div>
           </div>
 
           <div className="flex items-center gap-3 py-1">
