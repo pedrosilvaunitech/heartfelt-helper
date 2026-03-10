@@ -355,7 +355,6 @@ echo ""
 echo -e "${YELLOW}[7/8] Criando docker-compose.yml...${NC}"
 
 cat > docker-compose.yml << COMPOSE_EOF
-version: "3.8"
 
 # ${PROJECT_NAME} - Deploy Local Isolado
 # Gerado por setup-local.sh em $(date)
