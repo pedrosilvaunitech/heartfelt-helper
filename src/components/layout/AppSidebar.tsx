@@ -37,7 +37,7 @@ export function AppSidebar() {
 
   useEffect(() => {
     const checkPermissions = async () => {
-      if (roles.includes('admin')) {
+      if (roles.includes('admin') || roles.includes('dev')) {
         setVisibleNav(navItemsBase);
         setVisibleBottom(bottomItems);
         return;
