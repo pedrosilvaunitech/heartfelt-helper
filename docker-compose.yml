@@ -1,4 +1,4 @@
-version: "3.8"
+# docker-compose version is obsolete and ignored
 
 # PrintGuard Monitor - Deploy 100% Local (Isolado)
 # Uso: docker compose up -d
