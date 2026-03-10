@@ -394,10 +394,10 @@ services:
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
-      API_EXTERNAL_URL: http://localhost:${API_PORT}
+      API_EXTERNAL_URL: http://\${HOST_IP:-localhost}:${API_PORT}
       GOTRUE_DB_DRIVER: postgres
       GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
-      GOTRUE_SITE_URL: http://localhost:${APP_PORT}
+      GOTRUE_SITE_URL: http://\${HOST_IP:-localhost}:${APP_PORT}
       GOTRUE_URI_ALLOW_LIST: ""
       GOTRUE_DISABLE_SIGNUP: "false"
       GOTRUE_JWT_ADMIN_ROLES: service_role
