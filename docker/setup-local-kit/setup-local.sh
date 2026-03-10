@@ -46,6 +46,7 @@ while [[ $# -gt 0 ]]; do
     --app-port) APP_PORT="$2"; shift 2 ;;
     --password) POSTGRES_PASSWORD="$2"; shift 2 ;;
     --jwt-secret) JWT_SECRET="$2"; shift 2 ;;
+    --host) HOST_IP="$2"; shift 2 ;;
     --skip-docker) SKIP_DOCKER=true; shift ;;
     --skip-npm) SKIP_NPM=true; shift ;;
     --production) PRODUCTION=true; shift ;;
