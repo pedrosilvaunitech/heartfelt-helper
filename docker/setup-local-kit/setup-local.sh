@@ -656,6 +656,186 @@ if [ "$SKIP_DOCKER" = false ]; then
   else
     echo -e "${YELLOW}⚠ Nenhuma migration encontrada em supabase/migrations/${NC}"
   fi
+
+  # ============================================================
+  # Criar tabelas da aplicação e usuário DEV
+  # ============================================================
+  echo ""
+  echo -e "${YELLOW}Criando tabelas da aplicação e funções...${NC}"
+  docker exec -i ${PROJECT_NAME}-db psql -U postgres -d postgres <<'APP_SQL'
+-- Tabelas da aplicação
+CREATE TABLE IF NOT EXISTS public.roles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  description text,
+  is_system boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.user_roles (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  role_id uuid NOT NULL REFERENCES public.roles(id) ON DELETE CASCADE,
+  assigned_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(user_id, role_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.role_permissions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  role_id uuid NOT NULL REFERENCES public.roles(id) ON DELETE CASCADE,
+  page_path text NOT NULL,
+  can_view boolean NOT NULL DEFAULT false,
+  can_edit boolean NOT NULL DEFAULT false
+);
+
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id uuid PRIMARY KEY,
+  full_name text NOT NULL DEFAULT '',
+  email text NOT NULL DEFAULT '',
+  avatar_url text,
+  department text,
+  phone text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid,
+  user_email text,
+  action text NOT NULL,
+  entity_type text,
+  entity_id text,
+  details text,
+  old_data jsonb,
+  new_data jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- Cargos padrão
+INSERT INTO public.roles (name, description, is_system) VALUES
+  ('dev', 'Desenvolvedor com acesso total', true),
+  ('admin', 'Administrador do sistema', true),
+  ('technician', 'Técnico de manutenção', true),
+  ('viewer', 'Visualizador apenas leitura', true)
+ON CONFLICT (name) DO NOTHING;
+
+-- Funções de segurança
+CREATE OR REPLACE FUNCTION public.has_role_name(_user_id uuid, _role_name text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.user_roles ur
+    JOIN public.roles r ON r.id = ur.role_id
+    WHERE ur.user_id = _user_id AND r.name = _role_name
+  )
+$$;
+
+CREATE OR REPLACE FUNCTION public.get_user_roles(_user_id uuid)
+RETURNS text[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE(array_agg(r.name), ARRAY[]::text[])
+  FROM public.user_roles ur
+  JOIN public.roles r ON r.id = ur.role_id
+  WHERE ur.user_id = _user_id
+$$;
+
+CREATE OR REPLACE FUNCTION public.has_page_permission(_user_id uuid, _page_path text, _permission text DEFAULT 'view')
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT
+    public.has_role_name(_user_id, 'admin')
+    OR public.has_role_name(_user_id, 'dev')
+    OR EXISTS (
+      SELECT 1 FROM public.user_roles ur
+      JOIN public.role_permissions rp ON rp.role_id = ur.role_id
+      WHERE ur.user_id = _user_id AND rp.page_path = _page_path
+        AND ((_permission = 'view' AND rp.can_view) OR (_permission = 'edit' AND rp.can_edit))
+    )
+$$;
+
+CREATE OR REPLACE FUNCTION public.create_profile_with_role(_user_id uuid, _full_name text, _email text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE _is_first boolean; _role_name text;
+BEGIN
+  SELECT NOT EXISTS (SELECT 1 FROM public.profiles LIMIT 1) INTO _is_first;
+  INSERT INTO public.profiles (id, full_name, email) VALUES (_user_id, _full_name, _email)
+    ON CONFLICT (id) DO NOTHING;
+  IF _is_first THEN _role_name := 'dev'; ELSE _role_name := 'viewer'; END IF;
+  INSERT INTO public.user_roles (user_id, role_id)
+    SELECT _user_id, id FROM public.roles WHERE name = _role_name
+    ON CONFLICT (user_id, role_id) DO NOTHING;
+END;
+$$;
+
+-- RLS Policies (idempotent with DO blocks)
+DO $$ BEGIN
+  -- Profiles
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='profiles' AND policyname='Users can view all profiles') THEN
+    CREATE POLICY "Users can view all profiles" ON public.profiles FOR SELECT TO authenticated USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='profiles' AND policyname='Users can update own profile') THEN
+    CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE TO authenticated USING (id = auth.uid());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='profiles' AND policyname='Users can insert own profile') THEN
+    CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT TO authenticated WITH CHECK (id = auth.uid());
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='profiles' AND policyname='Admins can update any profile') THEN
+    CREATE POLICY "Admins can update any profile" ON public.profiles FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
+  END IF;
+  -- Roles
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='roles' AND policyname='Authenticated can view roles') THEN
+    CREATE POLICY "Authenticated can view roles" ON public.roles FOR SELECT TO authenticated USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='roles' AND policyname='Admins can insert roles') THEN
+    CREATE POLICY "Admins can insert roles" ON public.roles FOR INSERT TO authenticated WITH CHECK (has_role_name(auth.uid(), 'admin'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='roles' AND policyname='Admins can update roles') THEN
+    CREATE POLICY "Admins can update roles" ON public.roles FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='roles' AND policyname='Admins can delete roles') THEN
+    CREATE POLICY "Admins can delete roles" ON public.roles FOR DELETE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
+  END IF;
+  -- User roles
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_roles' AND policyname='Authenticated can view user_roles') THEN
+    CREATE POLICY "Authenticated can view user_roles" ON public.user_roles FOR SELECT TO authenticated USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_roles' AND policyname='Admins can insert user_roles') THEN
+    CREATE POLICY "Admins can insert user_roles" ON public.user_roles FOR INSERT TO authenticated WITH CHECK (has_role_name(auth.uid(), 'admin'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_roles' AND policyname='Admins can update user_roles') THEN
+    CREATE POLICY "Admins can update user_roles" ON public.user_roles FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_roles' AND policyname='Admins can delete user_roles') THEN
+    CREATE POLICY "Admins can delete user_roles" ON public.user_roles FOR DELETE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
+  END IF;
+  -- Role permissions
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='role_permissions' AND policyname='Authenticated can view permissions') THEN
+    CREATE POLICY "Authenticated can view permissions" ON public.role_permissions FOR SELECT TO authenticated USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='role_permissions' AND policyname='Admins can insert permissions') THEN
+    CREATE POLICY "Admins can insert permissions" ON public.role_permissions FOR INSERT TO authenticated WITH CHECK (has_role_name(auth.uid(), 'admin'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='role_permissions' AND policyname='Admins can update permissions') THEN
+    CREATE POLICY "Admins can update permissions" ON public.role_permissions FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='role_permissions' AND policyname='Admins can delete permissions') THEN
+    CREATE POLICY "Admins can delete permissions" ON public.role_permissions FOR DELETE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
+  END IF;
+  -- Audit logs
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='audit_logs' AND policyname='Admins can view audit logs') THEN
+    CREATE POLICY "Admins can view audit logs" ON public.audit_logs FOR SELECT TO authenticated USING (has_role_name(auth.uid(), 'admin'));
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='audit_logs' AND policyname='Authenticated can insert own audit logs') THEN
+    CREATE POLICY "Authenticated can insert own audit logs" ON public.audit_logs FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+  END IF;
+END $$;
+APP_SQL
+  echo -e "${GREEN}✓ Tabelas, funções e RLS da aplicação criados${NC}"
 else
   echo ""
   echo -e "${YELLOW}Docker pulado (--skip-docker)${NC}"
