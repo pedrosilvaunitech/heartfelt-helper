@@ -213,6 +213,12 @@ ALTER ROLE supabase_auth_admin PASSWORD '${POSTGRES_PASSWORD}';
 -- Schema auth (necessário para GoTrue)
 CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION supabase_auth_admin;
 
+-- Permissões do supabase_auth_admin no schema public (CRÍTICO!)
+GRANT ALL ON SCHEMA public TO supabase_auth_admin;
+GRANT CREATE ON SCHEMA public TO supabase_auth_admin;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO supabase_auth_admin;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO supabase_auth_admin;
+
 -- Permissões do schema public
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
