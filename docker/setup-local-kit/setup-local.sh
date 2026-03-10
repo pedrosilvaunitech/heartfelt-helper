@@ -70,9 +70,10 @@ echo "║     🚀 Setup Local - Projeto Lovable            ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo -e "${NC}"
 echo -e "${BLUE}Projeto:${NC}  $PROJECT_NAME"
-echo -e "${BLUE}DB:${NC}       localhost:$DB_PORT"
-echo -e "${BLUE}API:${NC}      localhost:$API_PORT"
-echo -e "${BLUE}App:${NC}      localhost:$APP_PORT"
+echo -e "${BLUE}Host:${NC}    $HOST_IP"
+echo -e "${BLUE}DB:${NC}       $HOST_IP:$DB_PORT"
+echo -e "${BLUE}API:${NC}      $HOST_IP:$API_PORT"
+echo -e "${BLUE}App:${NC}      $HOST_IP:$APP_PORT"
 echo ""
 
 # ============================================================
