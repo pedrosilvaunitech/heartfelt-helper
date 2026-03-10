@@ -548,6 +548,8 @@ services:
       VERIFY_JWT: "false"
     volumes:
       - ./supabase/functions:/home/deno/functions:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command:
       - start
       - --main-service
