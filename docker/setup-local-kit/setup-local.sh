@@ -70,9 +70,10 @@ echo "║     🚀 Setup Local - Projeto Lovable            ║"
 echo "╚══════════════════════════════════════════════════╝"
 echo -e "${NC}"
 echo -e "${BLUE}Projeto:${NC}  $PROJECT_NAME"
-echo -e "${BLUE}DB:${NC}       localhost:$DB_PORT"
-echo -e "${BLUE}API:${NC}      localhost:$API_PORT"
-echo -e "${BLUE}App:${NC}      localhost:$APP_PORT"
+echo -e "${BLUE}Host:${NC}    $HOST_IP"
+echo -e "${BLUE}DB:${NC}       $HOST_IP:$DB_PORT"
+echo -e "${BLUE}API:${NC}      $HOST_IP:$API_PORT"
+echo -e "${BLUE}App:${NC}      $HOST_IP:$APP_PORT"
 echo ""
 
 # ============================================================
@@ -354,7 +355,6 @@ echo ""
 echo -e "${YELLOW}[7/8] Criando docker-compose.yml...${NC}"
 
 cat > docker-compose.yml << COMPOSE_EOF
-version: "3.8"
 
 # ${PROJECT_NAME} - Deploy Local Isolado
 # Gerado por setup-local.sh em $(date)
@@ -380,8 +380,9 @@ services:
     healthcheck:
       test: pg_isready -U postgres -h localhost
       interval: 5s
-      timeout: 5s
-      retries: 10
+      timeout: 10s
+      retries: 20
+      start_period: 30s
 
   # ============================================
   # Supabase Auth (GoTrue) - Autenticação
@@ -610,16 +611,16 @@ echo "║  ✅ Setup completo!                                  ║"
 echo "╠══════════════════════════════════════════════════════╣"
 echo "║                                                      ║"
 echo "║  📦 Serviços rodando:                                ║"
-echo "║    PostgreSQL:      localhost:${DB_PORT}                  ║"
-echo "║    API Gateway:     localhost:${API_PORT}                  ║"
+echo "║    PostgreSQL:      ${HOST_IP}:${DB_PORT}                  ║"
+echo "║    API Gateway:     ${HOST_IP}:${API_PORT}                  ║"
 echo "║    Auth (GoTrue):   interno (via Kong)                ║"
 echo "║    PostgREST:       interno (via Kong)                ║"
 echo "║    Edge Functions:  interno (via Kong)                ║"
 echo "║                                                      ║"
 echo "║  🔗 URLs úteis:                                      ║"
-echo "║    API:    http://localhost:${API_PORT}/rest/v1/           ║"
-echo "║    Auth:   http://localhost:${API_PORT}/auth/v1/           ║"
-echo "║    Funcs:  http://localhost:${API_PORT}/functions/v1/      ║"
+echo "║    API:    http://${HOST_IP}:${API_PORT}/rest/v1/           ║"
+echo "║    Auth:   http://${HOST_IP}:${API_PORT}/auth/v1/           ║"
+echo "║    Funcs:  http://${HOST_IP}:${API_PORT}/functions/v1/      ║"
 echo "║                                                      ║"
 echo "║  🚀 Para iniciar o frontend:                         ║"
 echo "║    npm run dev -- --host 0.0.0.0 --port ${APP_PORT}       ║"
@@ -628,14 +629,14 @@ echo "║  🔄 Com PM2 (background):                            ║"
 echo "║    pm2 start \"npm run dev -- --host 0.0.0.0           ║"
 echo "║      --port ${APP_PORT}\" --name ${PROJECT_NAME}                  ║"
 echo "║                                                      ║"
-echo "║  🌐 Acesse: http://localhost:${APP_PORT}                  ║"
+echo "║  🌐 Acesse: http://${HOST_IP}:${APP_PORT}                  ║"
 echo "╚══════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 echo ""
 echo -e "${BLUE}Resumo de acesso:${NC}"
-echo -e "  PostgreSQL:  postgresql://postgres:${POSTGRES_PASSWORD}@localhost:${DB_PORT}/postgres"
-echo -e "  API:         http://localhost:${API_PORT}"
-echo -e "  Frontend:    http://localhost:${APP_PORT}"
+echo -e "  PostgreSQL:  postgresql://postgres:${POSTGRES_PASSWORD}@${HOST_IP}:${DB_PORT}/postgres"
+echo -e "  API:         http://${HOST_IP}:${API_PORT}"
+echo -e "  Frontend:    http://${HOST_IP}:${APP_PORT}"
 echo ""
 echo -e "${YELLOW}⚠ Salve o arquivo .env.local em local seguro!${NC}"
 echo -e "${YELLOW}⚠ Primeiro usuário cadastrado recebe acesso total (dev).${NC}"
