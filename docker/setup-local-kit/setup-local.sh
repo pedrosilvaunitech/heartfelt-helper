@@ -30,6 +30,7 @@ PROJECT_NAME="lovable-app"
 DB_PORT=54320
 API_PORT=54321
 APP_PORT=3001
+HOST_IP="localhost"
 POSTGRES_PASSWORD=""
 JWT_SECRET=""
 SKIP_DOCKER=false
@@ -45,6 +46,7 @@ while [[ $# -gt 0 ]]; do
     --app-port) APP_PORT="$2"; shift 2 ;;
     --password) POSTGRES_PASSWORD="$2"; shift 2 ;;
     --jwt-secret) JWT_SECRET="$2"; shift 2 ;;
+    --host) HOST_IP="$2"; shift 2 ;;
     --skip-docker) SKIP_DOCKER=true; shift ;;
     --skip-npm) SKIP_NPM=true; shift ;;
     --production) PRODUCTION=true; shift ;;
@@ -212,6 +214,12 @@ ALTER ROLE supabase_auth_admin PASSWORD '${POSTGRES_PASSWORD}';
 
 -- Schema auth (necessário para GoTrue)
 CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION supabase_auth_admin;
+
+-- Permissões do supabase_auth_admin no schema public (CRÍTICO!)
+GRANT ALL ON SCHEMA public TO supabase_auth_admin;
+GRANT CREATE ON SCHEMA public TO supabase_auth_admin;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO supabase_auth_admin;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO supabase_auth_admin;
 
 -- Permissões do schema public
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
@@ -388,10 +396,10 @@ services:
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
-      API_EXTERNAL_URL: http://localhost:${API_PORT}
+      API_EXTERNAL_URL: http://\${HOST_IP:-localhost}:${API_PORT}
       GOTRUE_DB_DRIVER: postgres
       GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
-      GOTRUE_SITE_URL: http://localhost:${APP_PORT}
+      GOTRUE_SITE_URL: http://\${HOST_IP:-localhost}:${APP_PORT}
       GOTRUE_URI_ALLOW_LIST: ""
       GOTRUE_DISABLE_SIGNUP: "false"
       GOTRUE_JWT_ADMIN_ROLES: service_role
@@ -500,11 +508,12 @@ SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}
 
 # Portas
 KONG_HTTP_PORT=${API_PORT}
-SITE_URL=http://localhost:${APP_PORT}
-API_EXTERNAL_URL=http://localhost:${API_PORT}
+HOST_IP=${HOST_IP}
+SITE_URL=http://${HOST_IP}:${APP_PORT}
+API_EXTERNAL_URL=http://${HOST_IP}:${API_PORT}
 
 # Frontend (Vite)
-VITE_SUPABASE_URL=http://localhost:${API_PORT}
+VITE_SUPABASE_URL=http://${HOST_IP}:${API_PORT}
 VITE_SUPABASE_PUBLISHABLE_KEY=${ANON_KEY}
 VITE_SUPABASE_PROJECT_ID=${PROJECT_NAME}
 VITE_PORT=${APP_PORT}
