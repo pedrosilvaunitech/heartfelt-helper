@@ -548,6 +548,8 @@ services:
       VERIFY_JWT: "false"
     volumes:
       - ./supabase/functions:/home/deno/functions:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command:
       - start
       - --main-service
@@ -772,68 +774,55 @@ BEGIN
 END;
 $$;
 
--- RLS Policies (idempotent with DO blocks)
-DO $$ BEGIN
-  -- Profiles
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='profiles' AND policyname='Users can view all profiles') THEN
-    CREATE POLICY "Users can view all profiles" ON public.profiles FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='profiles' AND policyname='Users can update own profile') THEN
-    CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE TO authenticated USING (id = auth.uid());
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='profiles' AND policyname='Users can insert own profile') THEN
-    CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT TO authenticated WITH CHECK (id = auth.uid());
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='profiles' AND policyname='Admins can update any profile') THEN
-    CREATE POLICY "Admins can update any profile" ON public.profiles FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
-  END IF;
-  -- Roles
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='roles' AND policyname='Authenticated can view roles') THEN
-    CREATE POLICY "Authenticated can view roles" ON public.roles FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='roles' AND policyname='Admins can insert roles') THEN
-    CREATE POLICY "Admins can insert roles" ON public.roles FOR INSERT TO authenticated WITH CHECK (has_role_name(auth.uid(), 'admin'));
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='roles' AND policyname='Admins can update roles') THEN
-    CREATE POLICY "Admins can update roles" ON public.roles FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='roles' AND policyname='Admins can delete roles') THEN
-    CREATE POLICY "Admins can delete roles" ON public.roles FOR DELETE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
-  END IF;
-  -- User roles
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_roles' AND policyname='Authenticated can view user_roles') THEN
-    CREATE POLICY "Authenticated can view user_roles" ON public.user_roles FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_roles' AND policyname='Admins can insert user_roles') THEN
-    CREATE POLICY "Admins can insert user_roles" ON public.user_roles FOR INSERT TO authenticated WITH CHECK (has_role_name(auth.uid(), 'admin'));
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_roles' AND policyname='Admins can update user_roles') THEN
-    CREATE POLICY "Admins can update user_roles" ON public.user_roles FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_roles' AND policyname='Admins can delete user_roles') THEN
-    CREATE POLICY "Admins can delete user_roles" ON public.user_roles FOR DELETE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
-  END IF;
-  -- Role permissions
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='role_permissions' AND policyname='Authenticated can view permissions') THEN
-    CREATE POLICY "Authenticated can view permissions" ON public.role_permissions FOR SELECT TO authenticated USING (true);
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='role_permissions' AND policyname='Admins can insert permissions') THEN
-    CREATE POLICY "Admins can insert permissions" ON public.role_permissions FOR INSERT TO authenticated WITH CHECK (has_role_name(auth.uid(), 'admin'));
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='role_permissions' AND policyname='Admins can update permissions') THEN
-    CREATE POLICY "Admins can update permissions" ON public.role_permissions FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='role_permissions' AND policyname='Admins can delete permissions') THEN
-    CREATE POLICY "Admins can delete permissions" ON public.role_permissions FOR DELETE TO authenticated USING (has_role_name(auth.uid(), 'admin'));
-  END IF;
-  -- Audit logs
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='audit_logs' AND policyname='Admins can view audit logs') THEN
-    CREATE POLICY "Admins can view audit logs" ON public.audit_logs FOR SELECT TO authenticated USING (has_role_name(auth.uid(), 'admin'));
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='audit_logs' AND policyname='Authenticated can insert own audit logs') THEN
-    CREATE POLICY "Authenticated can insert own audit logs" ON public.audit_logs FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
-  END IF;
-END $$;
+-- RLS Policies (drop and recreate to ensure PERMISSIVE)
+-- Profiles
+DROP POLICY IF EXISTS "Users can view all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can update any profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admins can delete profiles" ON public.profiles;
+CREATE POLICY "Users can view all profiles" ON public.profiles FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT TO authenticated WITH CHECK (id = auth.uid());
+CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE TO authenticated USING (id = auth.uid());
+CREATE POLICY "Admins can update any profile" ON public.profiles FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
+CREATE POLICY "Admins can delete profiles" ON public.profiles FOR DELETE TO authenticated USING (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
+
+-- Roles
+DROP POLICY IF EXISTS "Authenticated can view roles" ON public.roles;
+DROP POLICY IF EXISTS "Admins can insert roles" ON public.roles;
+DROP POLICY IF EXISTS "Admins can update roles" ON public.roles;
+DROP POLICY IF EXISTS "Admins can delete roles" ON public.roles;
+CREATE POLICY "Authenticated can view roles" ON public.roles FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admins can insert roles" ON public.roles FOR INSERT TO authenticated WITH CHECK (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
+CREATE POLICY "Admins can update roles" ON public.roles FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
+CREATE POLICY "Admins can delete roles" ON public.roles FOR DELETE TO authenticated USING (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
+
+-- User roles
+DROP POLICY IF EXISTS "Authenticated can view user_roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins can insert user_roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins can update user_roles" ON public.user_roles;
+DROP POLICY IF EXISTS "Admins can delete user_roles" ON public.user_roles;
+CREATE POLICY "Authenticated can view user_roles" ON public.user_roles FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admins can insert user_roles" ON public.user_roles FOR INSERT TO authenticated WITH CHECK (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
+CREATE POLICY "Admins can update user_roles" ON public.user_roles FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
+CREATE POLICY "Admins can delete user_roles" ON public.user_roles FOR DELETE TO authenticated USING (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
+
+-- Role permissions
+DROP POLICY IF EXISTS "Authenticated can view permissions" ON public.role_permissions;
+DROP POLICY IF EXISTS "Admins can insert permissions" ON public.role_permissions;
+DROP POLICY IF EXISTS "Admins can update permissions" ON public.role_permissions;
+DROP POLICY IF EXISTS "Admins can delete permissions" ON public.role_permissions;
+CREATE POLICY "Authenticated can view permissions" ON public.role_permissions FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admins can insert permissions" ON public.role_permissions FOR INSERT TO authenticated WITH CHECK (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
+CREATE POLICY "Admins can update permissions" ON public.role_permissions FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
+CREATE POLICY "Admins can delete permissions" ON public.role_permissions FOR DELETE TO authenticated USING (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
+
+-- Audit logs
+DROP POLICY IF EXISTS "Admins can view audit logs" ON public.audit_logs;
+DROP POLICY IF EXISTS "Admins and devs can view audit logs" ON public.audit_logs;
+DROP POLICY IF EXISTS "Authenticated can insert own audit logs" ON public.audit_logs;
+CREATE POLICY "Admins and devs can view audit logs" ON public.audit_logs FOR SELECT TO authenticated USING (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
+CREATE POLICY "Authenticated can insert own audit logs" ON public.audit_logs FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
 APP_SQL
   echo -e "${GREEN}✓ Tabelas, funções e RLS da aplicação criados${NC}"
 else
