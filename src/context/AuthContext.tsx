@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -33,20 +33,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const isSigningOut = useRef(false);
+
+  const clearState = useCallback(() => {
+    setUser(null);
+    setSession(null);
+    setProfile(null);
+    setRoles([]);
+  }, []);
+
+  const handleRLSError = useCallback((error: any) => {
+    if (error?.code === '42501' || error?.message?.includes('row-level security') ||
+        error?.status === 401 || error?.status === 403) {
+      console.warn('RLS/Auth error detected, signing out:', error.message);
+      if (!isSigningOut.current) {
+        isSigningOut.current = true;
+        supabase.auth.signOut().finally(() => {
+          clearState();
+          isSigningOut.current = false;
+        });
+      }
+      return true;
+    }
+    return false;
+  }, [clearState]);
 
   const fetchProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
+    
+    if (error) {
+      if (handleRLSError(error)) return;
+      // Profile doesn't exist - try to create it
+      if (error.code === 'PGRST116') {
+        const currentUser = (await supabase.auth.getUser()).data.user;
+        if (currentUser) {
+          const { error: createError } = await supabase.rpc('create_profile_with_role', {
+            _user_id: currentUser.id,
+            _full_name: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'Usuário',
+            _email: currentUser.email || '',
+          });
+          if (createError) {
+            console.error('Error creating profile:', createError);
+            return;
+          }
+          // Refetch after creation
+          const { data: newProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          if (newProfile) setProfile(newProfile as Profile);
+        }
+        return;
+      }
+      console.error('Error fetching profile:', error);
+      return;
+    }
     if (data) setProfile(data as Profile);
-  }, []);
+  }, [handleRLSError]);
 
   const fetchRoles = useCallback(async (userId: string) => {
-    const { data } = await supabase.rpc('get_user_roles', { _user_id: userId });
+    const { data, error } = await supabase.rpc('get_user_roles', { _user_id: userId });
+    if (error) {
+      if (handleRLSError(error)) return;
+      console.error('Error fetching roles:', error);
+      return;
+    }
     if (data) setRoles(data as string[]);
-  }, []);
+  }, [handleRLSError]);
 
   const refreshProfile = useCallback(async () => {
     if (user) {
@@ -61,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          // Use setTimeout to avoid Supabase deadlock
           setTimeout(() => {
             fetchProfile(session.user.id);
             fetchRoles(session.user.id);
@@ -102,7 +161,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     
     if (!error && data.user) {
-      // Create profile via security definer function
       await supabase.rpc('create_profile_with_role', {
         _user_id: data.user.id,
         _full_name: fullName,
@@ -114,20 +172,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    isSigningOut.current = true;
     await supabase.auth.signOut();
-    setProfile(null);
-    setRoles([]);
+    clearState();
+    isSigningOut.current = false;
   };
 
   const hasRole = (role: string) => roles.includes(role);
 
   const hasPagePermission = async (pagePath: string, permission: 'view' | 'edit' = 'view') => {
     if (!user) return false;
-    const { data } = await supabase.rpc('has_page_permission', {
+    // Dev and admin bypass
+    if (roles.includes('dev') || roles.includes('admin')) return true;
+    const { data, error } = await supabase.rpc('has_page_permission', {
       _user_id: user.id,
       _page_path: pagePath,
       _permission: permission,
     });
+    if (error) {
+      handleRLSError(error);
+      return false;
+    }
     return !!data;
   };
 
