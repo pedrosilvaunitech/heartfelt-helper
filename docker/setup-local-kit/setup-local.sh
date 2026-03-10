@@ -380,8 +380,9 @@ services:
     healthcheck:
       test: pg_isready -U postgres -h localhost
       interval: 5s
-      timeout: 5s
-      retries: 10
+      timeout: 10s
+      retries: 20
+      start_period: 30s
 
   # ============================================
   # Supabase Auth (GoTrue) - Autenticação
