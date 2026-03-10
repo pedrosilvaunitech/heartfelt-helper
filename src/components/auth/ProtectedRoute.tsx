@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -44,7 +44,8 @@ export function PermissionGate({
       setAllowed(false);
       return;
     }
-    if (hasRole('admin')) {
+    // Dev and admin bypass all permission checks
+    if (hasRole('dev') || hasRole('admin')) {
       setAllowed(true);
       return;
     }
