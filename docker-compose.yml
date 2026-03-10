@@ -116,7 +116,6 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
       SUPABASE_DB_URL: postgres://postgres:${POSTGRES_PASSWORD:-printguard_secret_2024}@db:5432/postgres
       VERIFY_JWT: "false"
-      SUPABASE_INTERNAL_FUNCTIONS_PATH: /home/deno/functions
     volumes:
       - ./supabase/functions:/home/deno/functions:ro
     ports:
@@ -125,6 +124,8 @@ services:
       - start
       - --main-service
       - /home/deno/functions/main
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   printguard-db-data:
