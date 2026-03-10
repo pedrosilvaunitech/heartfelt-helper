@@ -2,7 +2,6 @@ _format_version: "2.1"
 _transform: true
 
 services:
-  # PostgREST
   - name: rest-v1
     url: http://rest:3000/
     routes:
@@ -12,13 +11,37 @@ services:
           - /rest/v1/
     plugins:
       - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          headers:
+            - Accept
+            - Accept-Version
+            - Content-Length
+            - Content-MD5
+            - Content-Type
+            - Date
+            - X-Auth-Token
+            - Authorization
+            - apikey
+            - x-client-info
+          exposed_headers:
+            - X-Total-Count
+          credentials: true
+          max_age: 3600
       - name: key-auth
         config:
           hide_credentials: false
           key_names:
             - apikey
 
-  # Auth (GoTrue)
   - name: auth-v1
     url: http://auth:9999/
     routes:
@@ -28,8 +51,25 @@ services:
           - /auth/v1/
     plugins:
       - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          headers:
+            - Accept
+            - Content-Type
+            - Authorization
+            - apikey
+            - x-client-info
+          credentials: true
+          max_age: 3600
 
-  # Edge Functions
   - name: functions-v1
     url: http://functions:9000/
     routes:
@@ -39,6 +79,24 @@ services:
           - /functions/v1/
     plugins:
       - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          headers:
+            - Accept
+            - Content-Type
+            - Authorization
+            - apikey
+            - x-client-info
+          credentials: true
+          max_age: 3600
 
 consumers:
   - username: anon
