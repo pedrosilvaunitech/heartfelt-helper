@@ -25,8 +25,8 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-# Defaults
-PROJECT_NAME="lovable-app"
+# Defaults - auto-detect project name from current directory
+PROJECT_NAME=$(basename "$(pwd)" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
 DB_PORT=54320
 API_PORT=54321
 APP_PORT=3001
