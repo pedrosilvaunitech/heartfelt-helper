@@ -10,7 +10,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
 export default function Alerts() {
-  const { alerts } = usePrinters();
+  const alerts: any[] = []; // TODO: implement alerts from database
   const [severityFilter, setSeverityFilter] = useState('all');
   const [alertState, setAlertState] = useState(alerts);
 

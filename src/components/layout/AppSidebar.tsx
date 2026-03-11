@@ -30,7 +30,7 @@ const bottomItems = [
 
 export function AppSidebar() {
   const location = useLocation();
-  const { alerts } = usePrinters();
+  const alerts: any[] = []; // TODO: implement alerts from database
   const { profile, roles, hasPagePermission, signOut } = useAuth();
   const [visibleNav, setVisibleNav] = useState(navItemsBase);
   const [visibleBottom, setVisibleBottom] = useState(bottomItems);
