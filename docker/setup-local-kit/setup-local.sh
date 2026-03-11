@@ -413,13 +413,12 @@ services:
       JWT_EXP: 3600
     volumes:
       - ${PROJECT_NAME}-db-data:/var/lib/postgresql/data
-      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/00-init-roles.sql:ro
     healthcheck:
       test: pg_isready -U supabase_admin -d postgres -h localhost
       interval: 5s
       timeout: 10s
-      retries: 20
-      start_period: 30s
+      retries: 30
+      start_period: 60s
 
   # ============================================
   # Supabase Auth (GoTrue) - Autenticação
