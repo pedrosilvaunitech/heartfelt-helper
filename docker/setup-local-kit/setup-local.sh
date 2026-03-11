@@ -160,7 +160,8 @@ echo -e "${YELLOW}[4/8] Criando SQL de inicialização...${NC}"
 cat > docker/init-db.sql << INITSQL_EOF
 -- ============================================================
 -- Roles necessários para o Supabase funcionar localmente
--- Este script roda automaticamente na primeira vez que o banco sobe
+-- IMPORTANTE: NÃO tocar no schema 'auth' - ele é gerenciado
+-- automaticamente pela imagem supabase/postgres
 -- ============================================================
 
 -- Role: anon (usado pelo PostgREST para requests não autenticados)
@@ -204,6 +205,7 @@ GRANT authenticated TO authenticator;
 GRANT service_role TO authenticator;
 
 -- Role: supabase_auth_admin (usado pelo GoTrue para gerenciar auth)
+-- A imagem supabase/postgres já cria este role, mas precisamos garantir a senha
 DO \$\$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'supabase_auth_admin') THEN
@@ -213,13 +215,8 @@ END
 \$\$;
 ALTER ROLE supabase_auth_admin PASSWORD '${POSTGRES_PASSWORD}';
 
--- Schema auth (necessário para GoTrue)
--- GoTrue gerencia suas próprias migrations (tipos, tabelas, etc.)
--- Apenas garantimos que o schema exista e que supabase_auth_admin seja o dono
-CREATE SCHEMA IF NOT EXISTS auth;
-ALTER SCHEMA auth OWNER TO supabase_auth_admin;
-
--- Permissões TOTAIS do supabase_auth_admin (CRÍTICO para GoTrue rodar migrations!)
+-- NÃO criar nem alterar o schema auth - a imagem supabase/postgres já faz isso!
+-- Apenas garantir permissões necessárias
 GRANT ALL ON SCHEMA auth TO supabase_auth_admin;
 GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA auth TO supabase_auth_admin;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA auth TO supabase_auth_admin;
@@ -228,14 +225,13 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON TABLES TO supabase_auth_adm
 ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON SEQUENCES TO supabase_auth_admin;
 ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON FUNCTIONS TO supabase_auth_admin;
 
--- supabase_auth_admin precisa poder criar extensões
-GRANT supabase_auth_admin TO postgres;
+-- supabase_auth_admin precisa de acesso ao schema public também
 GRANT ALL ON SCHEMA public TO supabase_auth_admin;
 GRANT CREATE ON SCHEMA public TO supabase_auth_admin;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO supabase_auth_admin;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO supabase_auth_admin;
 
--- Permissões do schema public
+-- Permissões do schema public para roles do PostgREST
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
@@ -251,7 +247,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA public;
 
 -- Confirmar
-DO \$\$ BEGIN RAISE NOTICE '✅ Roles e schemas inicializados com sucesso!'; END \$\$;
+DO \$\$ BEGIN RAISE NOTICE '✅ Roles e permissões inicializados com sucesso!'; END \$\$;
 INITSQL_EOF
 
 echo -e "${GREEN}✓ docker/init-db.sql criado${NC}"
