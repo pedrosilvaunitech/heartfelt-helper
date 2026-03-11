@@ -605,8 +605,18 @@ if [ "$SKIP_DOCKER" = false ]; then
     # ============================================================
     echo -e "${YELLOW}Configurando roles e permissões do banco...${NC}"
     docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres <<ROLES_SQL
+-- Criar schemas base antes de tudo
+CREATE SCHEMA IF NOT EXISTS auth;
+CREATE SCHEMA IF NOT EXISTS extensions;
+CREATE SCHEMA IF NOT EXISTS storage;
+
+-- Permissões do schema auth para GoTrue
+GRANT ALL ON SCHEMA auth TO supabase_auth_admin;
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON TABLES TO supabase_auth_admin;
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON SEQUENCES TO supabase_auth_admin;
+ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON ROUTINES TO supabase_auth_admin;
+
 -- Authenticator (PostgREST connection role)
-DO \$\$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticator') THEN
     CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD '${POSTGRES_PASSWORD}';
