@@ -585,7 +585,7 @@ if [ "$SKIP_DOCKER" = false ]; then
   echo -e "${YELLOW}Aguardando banco ficar pronto...${NC}"
   RETRIES=0
   MAX_RETRIES=30
-  until docker exec ${PROJECT_NAME}-db pg_isready -U postgres -h localhost > /dev/null 2>&1; do
+  until docker exec ${PROJECT_NAME}-db pg_isready -U supabase_admin -d postgres -h localhost > /dev/null 2>&1; do
     RETRIES=$((RETRIES + 1))
     if [ $RETRIES -ge $MAX_RETRIES ]; then
       echo -e "${RED}✗ Banco não ficou pronto após ${MAX_RETRIES} tentativas${NC}"
