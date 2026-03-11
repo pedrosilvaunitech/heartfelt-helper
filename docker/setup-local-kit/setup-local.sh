@@ -415,7 +415,7 @@ services:
       - ${PROJECT_NAME}-db-data:/var/lib/postgresql/data
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/00-init-roles.sql:ro
     healthcheck:
-      test: pg_isready -U supabase_admin -h localhost
+      test: pg_isready -U supabase_admin -d postgres -h localhost
       interval: 5s
       timeout: 10s
       retries: 20
