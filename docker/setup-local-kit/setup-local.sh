@@ -615,7 +615,7 @@ if [ "$SKIP_DOCKER" = false ]; then
       if [ -f "$migration_file" ]; then
         MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
         migration_name=$(basename "$migration_file")
-        if docker exec -i ${PROJECT_NAME}-db psql -U postgres -h localhost -d postgres < "$migration_file" > /dev/null 2>&1; then
+        if docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres < "$migration_file" > /dev/null 2>&1; then
           echo -e "  ${GREEN}✓${NC} $migration_name"
         else
           MIGRATION_ERRORS=$((MIGRATION_ERRORS + 1))
