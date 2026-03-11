@@ -632,6 +632,25 @@ if [ "$SKIP_DOCKER" = false ]; then
   # Criar tabelas da aplicação e usuário DEV
   # ============================================================
   echo ""
+  echo -e "${YELLOW}Configurando grants dos roles...${NC}"
+  docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres <<'GRANTS_SQL'
+-- Grants para roles do PostgREST (roles já criados pela imagem)
+GRANT anon TO authenticator;
+GRANT authenticated TO authenticator;
+GRANT service_role TO authenticator;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO supabase_auth_admin;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO supabase_auth_admin;
+GRANTS_SQL
+  echo -e "${GREEN}✓ Grants aplicados${NC}"
+
+  echo ""
   echo -e "${YELLOW}Criando tabelas da aplicação e funções...${NC}"
   docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres <<'APP_SQL'
 -- Tabelas da aplicação
