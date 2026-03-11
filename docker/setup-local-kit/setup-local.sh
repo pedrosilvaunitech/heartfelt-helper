@@ -215,15 +215,8 @@ END
 \$\$;
 ALTER ROLE supabase_auth_admin PASSWORD '${POSTGRES_PASSWORD}';
 
--- NÃO criar nem alterar o schema auth - a imagem supabase/postgres já faz isso!
--- Apenas garantir permissões necessárias
-GRANT ALL ON SCHEMA auth TO supabase_auth_admin;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA auth TO supabase_auth_admin;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA auth TO supabase_auth_admin;
-GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA auth TO supabase_auth_admin;
-ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON TABLES TO supabase_auth_admin;
-ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON SEQUENCES TO supabase_auth_admin;
-ALTER DEFAULT PRIVILEGES IN SCHEMA auth GRANT ALL ON FUNCTIONS TO supabase_auth_admin;
+-- NÃO tocar no schema auth aqui - ele será criado pelo GoTrue na primeira execução.
+-- As permissões do auth são gerenciadas automaticamente pelo serviço de autenticação.
 
 -- supabase_auth_admin precisa de acesso ao schema public também
 GRANT ALL ON SCHEMA public TO supabase_auth_admin;
@@ -448,7 +441,7 @@ services:
       - ${PROJECT_NAME}-db-data:/var/lib/postgresql/data
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/00-init-roles.sql:ro
     healthcheck:
-      test: pg_isready -U postgres -h localhost
+      test: pg_isready -U supabase_admin -h localhost
       interval: 5s
       timeout: 10s
       retries: 20
