@@ -634,7 +634,7 @@ if [ "$SKIP_DOCKER" = false ]; then
     # Rodar init-db.sql manualmente caso docker-entrypoint não tenha rodado
     # (acontece se o volume já existia de uma instalação anterior)
     echo -e "${YELLOW}Garantindo roles do banco...${NC}"
-    docker exec -i ${PROJECT_NAME}-db psql -U postgres -d postgres < docker/init-db.sql 2>/dev/null || true
+    docker exec -i ${PROJECT_NAME}-db psql -U postgres -h localhost -d postgres < docker/init-db.sql 2>/dev/null || true
     echo -e "${GREEN}✓ Roles verificados${NC}"
   fi
   
