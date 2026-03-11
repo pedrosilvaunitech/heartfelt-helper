@@ -638,20 +638,25 @@ if [ "$SKIP_DOCKER" = false ]; then
     echo -e "${GREEN}✓ Roles verificados${NC}"
   fi
   
-  # Aplicar migrations se existirem
+  # Aplicar migrations se existirem (via docker exec, sem precisar do supabase CLI)
   if [ -d "supabase/migrations" ] && [ "$(ls -A supabase/migrations 2>/dev/null)" ]; then
     echo ""
     echo -e "${YELLOW}Aplicando migrations do banco...${NC}"
-    if command -v supabase &> /dev/null; then
-      supabase db reset --db-url "postgresql://postgres:${POSTGRES_PASSWORD}@localhost:${DB_PORT}/postgres" 2>/dev/null && \
-        echo -e "${GREEN}✓ Migrations aplicadas${NC}" || \
-        echo -e "${YELLOW}⚠ Migrations falharam. Execute manualmente:${NC}
-  supabase db reset --db-url \"postgresql://postgres:${POSTGRES_PASSWORD}@localhost:${DB_PORT}/postgres\""
-    else
-      echo -e "${YELLOW}⚠ Supabase CLI não encontrado.${NC}"
-      echo -e "  Instale: ${CYAN}npm install -g supabase${NC}"
-      echo -e "  Execute: ${CYAN}supabase db reset --db-url \"postgresql://postgres:${POSTGRES_PASSWORD}@localhost:${DB_PORT}/postgres\"${NC}"
-    fi
+    MIGRATION_COUNT=0
+    MIGRATION_ERRORS=0
+    for migration_file in supabase/migrations/*.sql; do
+      if [ -f "$migration_file" ]; then
+        MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
+        migration_name=$(basename "$migration_file")
+        if docker exec -i ${PROJECT_NAME}-db psql -U postgres -h localhost -d postgres < "$migration_file" > /dev/null 2>&1; then
+          echo -e "  ${GREEN}✓${NC} $migration_name"
+        else
+          MIGRATION_ERRORS=$((MIGRATION_ERRORS + 1))
+          echo -e "  ${YELLOW}⚠${NC} $migration_name (pode já estar aplicada)"
+        fi
+      fi
+    done
+    echo -e "${GREEN}✓ ${MIGRATION_COUNT} migrations processadas (${MIGRATION_ERRORS} avisos)${NC}"
   else
     echo -e "${YELLOW}⚠ Nenhuma migration encontrada em supabase/migrations/${NC}"
   fi
