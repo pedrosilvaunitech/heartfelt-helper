@@ -597,57 +597,49 @@ if [ "$SKIP_DOCKER" = false ]; then
   if [ $RETRIES -lt $MAX_RETRIES ]; then
     echo -e "${GREEN}✓ Banco pronto!${NC}"
     
-    # Rodar init-db.sql manualmente caso docker-entrypoint não tenha rodado
-    # (acontece se o volume já existia de uma instalação anterior)
-    echo -e "${YELLOW}Garantindo roles do banco...${NC}"
-    docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres < docker/init-db.sql 2>/dev/null || true
-    echo -e "${GREEN}✓ Roles verificados${NC}"
-  fi
-  
-  # Aplicar migrations se existirem (via docker exec, sem precisar do supabase CLI)
-  if [ -d "supabase/migrations" ] && [ "$(ls -A supabase/migrations 2>/dev/null)" ]; then
-    echo ""
-    echo -e "${YELLOW}Aplicando migrations do banco...${NC}"
-    MIGRATION_COUNT=0
-    MIGRATION_ERRORS=0
-    for migration_file in supabase/migrations/*.sql; do
-      if [ -f "$migration_file" ]; then
-        MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
-        migration_name=$(basename "$migration_file")
-        if docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres < "$migration_file" > /dev/null 2>&1; then
-          echo -e "  ${GREEN}✓${NC} $migration_name"
-        else
-          MIGRATION_ERRORS=$((MIGRATION_ERRORS + 1))
-          echo -e "  ${YELLOW}⚠${NC} $migration_name (pode já estar aplicada)"
-        fi
-      fi
-    done
-    echo -e "${GREEN}✓ ${MIGRATION_COUNT} migrations processadas (${MIGRATION_ERRORS} avisos)${NC}"
-  else
-    echo -e "${YELLOW}⚠ Nenhuma migration encontrada em supabase/migrations/${NC}"
-  fi
+    # ============================================================
+    # Setup completo dos roles via docker exec (pós-init)
+    # A imagem supabase/postgres já cria: anon, authenticated,
+    # service_role, supabase_admin, supabase_auth_admin, etc.
+    # Aqui garantimos authenticator + senha + grants
+    # ============================================================
+    echo -e "${YELLOW}Configurando roles e permissões do banco...${NC}"
+    docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres <<ROLES_SQL
+-- Authenticator (PostgREST connection role)
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticator') THEN
+    CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD '${POSTGRES_PASSWORD}';
+  END IF;
+END
+\$\$;
+ALTER ROLE authenticator PASSWORD '${POSTGRES_PASSWORD}';
 
-  # ============================================================
-  # Criar tabelas da aplicação e usuário DEV
-  # ============================================================
-  echo ""
-  echo -e "${YELLOW}Configurando grants dos roles...${NC}"
-  docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres <<'GRANTS_SQL'
--- Grants para roles do PostgREST (roles já criados pela imagem)
+-- Garantir senha do supabase_auth_admin para GoTrue
+ALTER ROLE supabase_auth_admin PASSWORD '${POSTGRES_PASSWORD}';
+
+-- Grants
 GRANT anon TO authenticator;
 GRANT authenticated TO authenticator;
 GRANT service_role TO authenticator;
+GRANT ALL ON SCHEMA public TO supabase_auth_admin;
+GRANT CREATE ON SCHEMA public TO supabase_auth_admin;
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO supabase_auth_admin;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO supabase_auth_admin;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO supabase_auth_admin;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO supabase_auth_admin;
-GRANTS_SQL
-  echo -e "${GREEN}✓ Grants aplicados${NC}"
+
+-- Extensões
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA public;
+ROLES_SQL
+    echo -e "${GREEN}✓ Roles e permissões configurados${NC}"
+  fi
 
   echo ""
   echo -e "${YELLOW}Criando tabelas da aplicação e funções...${NC}"
