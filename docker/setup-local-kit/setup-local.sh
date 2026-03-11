@@ -666,7 +666,7 @@ if [ "$SKIP_DOCKER" = false ]; then
   # ============================================================
   echo ""
   echo -e "${YELLOW}Criando tabelas da aplicação e funções...${NC}"
-  docker exec -i ${PROJECT_NAME}-db psql -U postgres -d postgres <<'APP_SQL'
+  docker exec -i ${PROJECT_NAME}-db psql -U postgres -h localhost -d postgres <<'APP_SQL'
 -- Tabelas da aplicação
 CREATE TABLE IF NOT EXISTS public.roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
