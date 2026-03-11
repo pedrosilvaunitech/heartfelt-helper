@@ -32,7 +32,7 @@ services:
   # Supabase Auth - Autenticação
   # ============================================
   auth:
-    image: supabase/gotrue:v2.158.1
+    image: supabase/gotrue:v2.149.0
     container_name: printguard-auth
     restart: unless-stopped
     depends_on:
