@@ -641,7 +641,33 @@ ROLES_SQL
     echo -e "${GREEN}✓ Roles e permissões configurados${NC}"
   fi
 
-  echo ""
+  # Aplicar migrations se existirem
+  if [ -d "supabase/migrations" ] && [ "$(ls -A supabase/migrations 2>/dev/null)" ]; then
+    echo ""
+    echo -e "${YELLOW}Aplicando migrations do banco...${NC}"
+    MIGRATION_COUNT=0
+    MIGRATION_ERRORS=0
+    for migration_file in supabase/migrations/*.sql; do
+      if [ -f "$migration_file" ]; then
+        MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
+        migration_name=$(basename "$migration_file")
+        if docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres < "$migration_file" > /dev/null 2>&1; then
+          echo -e "  ${GREEN}✓${NC} $migration_name"
+        else
+          MIGRATION_ERRORS=$((MIGRATION_ERRORS + 1))
+          echo -e "  ${YELLOW}⚠${NC} $migration_name (pode já estar aplicada)"
+        fi
+      fi
+    done
+    echo -e "${GREEN}✓ ${MIGRATION_COUNT} migrations processadas (${MIGRATION_ERRORS} avisos)${NC}"
+  else
+    echo -e "${YELLOW}⚠ Nenhuma migration encontrada em supabase/migrations/${NC}"
+  fi
+
+  # ============================================================
+  # Criar tabelas da aplicação e usuário DEV
+  # ============================================================
+
   echo -e "${YELLOW}Criando tabelas da aplicação e funções...${NC}"
   docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres <<'APP_SQL'
 -- Tabelas da aplicação
