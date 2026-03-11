@@ -3,11 +3,8 @@ import { AppSidebar } from './AppSidebar';
 import { Bell, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { usePrinters } from '@/context/PrinterContext';
-
 export function AppLayout() {
-  const { alerts } = usePrinters();
-  const unack = alerts.filter(a => !a.acknowledged).length;
+  const unack = 0; // TODO: implement alerts from database
 
   return (
     <div className="min-h-screen bg-background">

@@ -6,7 +6,8 @@ import { Building2, Printer, Wifi, AlertTriangle, FileText } from 'lucide-react'
 import { motion } from 'framer-motion';
 
 export default function Sectors() {
-  const { printers, alerts } = usePrinters();
+  const { printers } = usePrinters();
+  const alerts: any[] = []; // TODO: implement alerts from database
   const sectors = ['Financeiro', 'RH', 'Produção', 'TI', 'Recepção', 'Diretoria', 'Comercial', 'Logística'];
   const sectorStats = sectors.map(s => {
     const sectorPrinters = printers.filter(p => p.sector === s);

@@ -18,7 +18,8 @@ const chartConfig = {
 };
 
 export default function Dashboard() {
-  const { printers, alerts } = usePrinters();
+  const { printers } = usePrinters();
+  const alerts: any[] = []; // TODO: implement alerts from database
 
   const online = printers.filter(p => p.status === 'online').length;
   const offline = printers.filter(p => p.status === 'offline').length;

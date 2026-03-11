@@ -15,7 +15,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 export default function PrinterDetail() {
-  const { printers, alerts, updatePrinter } = usePrinters();
+  const { printers, updatePrinter } = usePrinters();
+  const alerts: any[] = []; // TODO: implement alerts from database
   const { id } = useParams();
   const [showWebMapper, setShowWebMapper] = useState(false);
   const [loading, setLoading] = useState(false);

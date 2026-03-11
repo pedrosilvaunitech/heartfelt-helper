@@ -13,7 +13,8 @@ const chartConfig = {
 };
 
 export default function Reports() {
-  const { printers, alerts } = usePrinters();
+  const { printers } = usePrinters();
+  const alerts: any[] = []; // TODO: implement alerts from database
 
   const statusData = [
     { name: 'Online', value: printers.filter(p => p.status === 'online').length, color: 'hsl(var(--success))' },
