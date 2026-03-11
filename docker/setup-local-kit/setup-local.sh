@@ -425,7 +425,7 @@ services:
   # IMPORTANTE: depende do DB estar healthy E do init-db.sql ter rodado
   # ============================================
   auth:
-    image: supabase/gotrue:v2.158.1
+    image: supabase/gotrue:v2.149.0
     container_name: ${PROJECT_NAME}-auth
     restart: unless-stopped
     depends_on:
