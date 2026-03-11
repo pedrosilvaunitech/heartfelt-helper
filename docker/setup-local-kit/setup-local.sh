@@ -159,37 +159,17 @@ echo -e "${YELLOW}[4/8] Criando SQL de inicialização...${NC}"
 
 cat > docker/init-db.sql << INITSQL_EOF
 -- ============================================================
--- Roles necessários para o Supabase funcionar localmente
--- IMPORTANTE: NÃO tocar no schema 'auth' - ele é gerenciado
--- automaticamente pela imagem supabase/postgres
+-- Complemento de roles para Supabase local
+-- IMPORTANTE: A imagem supabase/postgres:15.6.1.143 já cria os roles
+-- (anon, authenticated, service_role, supabase_admin, etc.) via seus
+-- próprios init-scripts. NÃO re-criar esses roles aqui ou a inicialização
+-- falha com "role already exists" e o banco fica unhealthy.
+--
+-- Este script APENAS configura o que a imagem NÃO faz automaticamente:
+--   - authenticator (com senha e grants)
+--   - supabase_auth_admin (senha para GoTrue conectar)
+--   - Permissões de schema public
 -- ============================================================
-
--- Role: anon (usado pelo PostgREST para requests não autenticados)
-DO \$\$
-BEGIN
-  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'anon') THEN
-    CREATE ROLE anon NOLOGIN NOINHERIT;
-  END IF;
-END
-\$\$;
-
--- Role: authenticated (usado pelo PostgREST para requests autenticados)
-DO \$\$
-BEGIN
-  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticated') THEN
-    CREATE ROLE authenticated NOLOGIN NOINHERIT;
-  END IF;
-END
-\$\$;
-
--- Role: service_role (acesso total, usado pelo SERVICE_ROLE_KEY)
-DO \$\$
-BEGIN
-  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'service_role') THEN
-    CREATE ROLE service_role NOLOGIN NOINHERIT BYPASSRLS;
-  END IF;
-END
-\$\$;
 
 -- Role: authenticator (usado pelo PostgREST para conectar e alternar roles)
 DO \$\$
@@ -200,12 +180,20 @@ BEGIN
 END
 \$\$;
 ALTER ROLE authenticator PASSWORD '${POSTGRES_PASSWORD}';
-GRANT anon TO authenticator;
-GRANT authenticated TO authenticator;
-GRANT service_role TO authenticator;
 
--- Role: supabase_auth_admin (usado pelo GoTrue para gerenciar auth)
--- A imagem supabase/postgres já cria este role, mas precisamos garantir a senha
+-- Grants só funcionam se os roles já existirem (a imagem os cria)
+-- Usamos DO block para não falhar se ainda não existirem
+DO \$\$
+BEGIN
+  EXECUTE 'GRANT anon TO authenticator';
+  EXECUTE 'GRANT authenticated TO authenticator';
+  EXECUTE 'GRANT service_role TO authenticator';
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Grants para authenticator serão aplicados após init-scripts da imagem';
+END
+\$\$;
+
+-- supabase_auth_admin - garantir senha para GoTrue conectar
 DO \$\$
 BEGIN
   IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'supabase_auth_admin') THEN
@@ -215,32 +203,18 @@ END
 \$\$;
 ALTER ROLE supabase_auth_admin PASSWORD '${POSTGRES_PASSWORD}';
 
--- NÃO tocar no schema auth aqui - ele será criado pelo GoTrue na primeira execução.
--- As permissões do auth são gerenciadas automaticamente pelo serviço de autenticação.
+-- NÃO tocar no schema auth - gerenciado pelo GoTrue automaticamente
 
--- supabase_auth_admin precisa de acesso ao schema public também
+-- supabase_auth_admin precisa de acesso ao schema public
 GRANT ALL ON SCHEMA public TO supabase_auth_admin;
 GRANT CREATE ON SCHEMA public TO supabase_auth_admin;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO supabase_auth_admin;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO supabase_auth_admin;
 
--- Permissões do schema public para roles do PostgREST
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
-
--- Permissões default para tabelas futuras
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
-
--- Extensões comuns
+-- Extensões comuns (IF NOT EXISTS para ser idempotente)
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA public;
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA public;
 
 -- Confirmar
-DO \$\$ BEGIN RAISE NOTICE '✅ Roles e permissões inicializados com sucesso!'; END \$\$;
+DO \$\$ BEGIN RAISE NOTICE '✅ Roles complementares inicializados!'; END \$\$;
 INITSQL_EOF
 
 echo -e "${GREEN}✓ docker/init-db.sql criado${NC}"
@@ -441,7 +415,7 @@ services:
       - ${PROJECT_NAME}-db-data:/var/lib/postgresql/data
       - ./docker/init-db.sql:/docker-entrypoint-initdb.d/00-init-roles.sql:ro
     healthcheck:
-      test: pg_isready -U supabase_admin -h localhost
+      test: pg_isready -U supabase_admin -d postgres -h localhost
       interval: 5s
       timeout: 10s
       retries: 20
@@ -611,7 +585,7 @@ if [ "$SKIP_DOCKER" = false ]; then
   echo -e "${YELLOW}Aguardando banco ficar pronto...${NC}"
   RETRIES=0
   MAX_RETRIES=30
-  until docker exec ${PROJECT_NAME}-db pg_isready -U postgres -h localhost > /dev/null 2>&1; do
+  until docker exec ${PROJECT_NAME}-db pg_isready -U supabase_admin -d postgres -h localhost > /dev/null 2>&1; do
     RETRIES=$((RETRIES + 1))
     if [ $RETRIES -ge $MAX_RETRIES ]; then
       echo -e "${RED}✗ Banco não ficou pronto após ${MAX_RETRIES} tentativas${NC}"
@@ -627,7 +601,7 @@ if [ "$SKIP_DOCKER" = false ]; then
     # Rodar init-db.sql manualmente caso docker-entrypoint não tenha rodado
     # (acontece se o volume já existia de uma instalação anterior)
     echo -e "${YELLOW}Garantindo roles do banco...${NC}"
-    docker exec -i ${PROJECT_NAME}-db psql -U postgres -h localhost -d postgres < docker/init-db.sql 2>/dev/null || true
+    docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres < docker/init-db.sql 2>/dev/null || true
     echo -e "${GREEN}✓ Roles verificados${NC}"
   fi
   
@@ -641,7 +615,7 @@ if [ "$SKIP_DOCKER" = false ]; then
       if [ -f "$migration_file" ]; then
         MIGRATION_COUNT=$((MIGRATION_COUNT + 1))
         migration_name=$(basename "$migration_file")
-        if docker exec -i ${PROJECT_NAME}-db psql -U postgres -h localhost -d postgres < "$migration_file" > /dev/null 2>&1; then
+        if docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres < "$migration_file" > /dev/null 2>&1; then
           echo -e "  ${GREEN}✓${NC} $migration_name"
         else
           MIGRATION_ERRORS=$((MIGRATION_ERRORS + 1))
@@ -658,8 +632,27 @@ if [ "$SKIP_DOCKER" = false ]; then
   # Criar tabelas da aplicação e usuário DEV
   # ============================================================
   echo ""
+  echo -e "${YELLOW}Configurando grants dos roles...${NC}"
+  docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres <<'GRANTS_SQL'
+-- Grants para roles do PostgREST (roles já criados pela imagem)
+GRANT anon TO authenticator;
+GRANT authenticated TO authenticator;
+GRANT service_role TO authenticator;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO supabase_auth_admin;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO supabase_auth_admin;
+GRANTS_SQL
+  echo -e "${GREEN}✓ Grants aplicados${NC}"
+
+  echo ""
   echo -e "${YELLOW}Criando tabelas da aplicação e funções...${NC}"
-  docker exec -i ${PROJECT_NAME}-db psql -U postgres -h localhost -d postgres <<'APP_SQL'
+  docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres <<'APP_SQL'
 -- Tabelas da aplicação
 CREATE TABLE IF NOT EXISTS public.roles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
