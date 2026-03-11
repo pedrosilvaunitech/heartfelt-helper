@@ -54,6 +54,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Auto-detectar IP da máquina se não fornecido
+if [ -z "$HOST_IP" ]; then
+  HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+  if [ -z "$HOST_IP" ]; then
+    HOST_IP=$(ip -4 addr show scope global | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+  fi
+  if [ -z "$HOST_IP" ]; then
+    HOST_IP="localhost"
+  fi
+  echo -e "${GREEN}✓ IP detectado automaticamente: ${HOST_IP}${NC}"
+fi
+
 # Gerar senha se não fornecida
 if [ -z "$POSTGRES_PASSWORD" ]; then
   POSTGRES_PASSWORD=$(openssl rand -hex 16 2>/dev/null || echo "${PROJECT_NAME}_secret_$(date +%s)")
