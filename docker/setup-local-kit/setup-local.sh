@@ -847,6 +847,16 @@ DROP POLICY IF EXISTS "Admins and devs can view audit logs" ON public.audit_logs
 DROP POLICY IF EXISTS "Authenticated can insert own audit logs" ON public.audit_logs;
 CREATE POLICY "Admins and devs can view audit logs" ON public.audit_logs FOR SELECT TO authenticated USING (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
 CREATE POLICY "Authenticated can insert own audit logs" ON public.audit_logs FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+
+-- Printers
+DROP POLICY IF EXISTS "Authenticated can view printers" ON public.printers;
+DROP POLICY IF EXISTS "Admins can insert printers" ON public.printers;
+DROP POLICY IF EXISTS "Admins can update printers" ON public.printers;
+DROP POLICY IF EXISTS "Admins can delete printers" ON public.printers;
+CREATE POLICY "Authenticated can view printers" ON public.printers FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Admins can insert printers" ON public.printers FOR INSERT TO authenticated WITH CHECK (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev') OR has_role_name(auth.uid(), 'technician'));
+CREATE POLICY "Admins can update printers" ON public.printers FOR UPDATE TO authenticated USING (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev') OR has_role_name(auth.uid(), 'technician'));
+CREATE POLICY "Admins can delete printers" ON public.printers FOR DELETE TO authenticated USING (has_role_name(auth.uid(), 'admin') OR has_role_name(auth.uid(), 'dev'));
 APP_SQL
   echo -e "${GREEN}✓ Tabelas, funções e RLS da aplicação criados${NC}"
 else
