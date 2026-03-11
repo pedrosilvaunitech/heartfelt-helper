@@ -714,12 +714,36 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS public.printers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ip text NOT NULL,
+  hostname text DEFAULT '',
+  brand text NOT NULL DEFAULT '',
+  model text NOT NULL DEFAULT '',
+  serial text DEFAULT '',
+  firmware text DEFAULT '',
+  mac text DEFAULT '',
+  location text DEFAULT '',
+  sector text DEFAULT '',
+  status text NOT NULL DEFAULT 'online' CHECK (status IN ('online', 'offline', 'warning', 'maintenance', 'disabled')),
+  uptime text DEFAULT '0d 0h 0m',
+  page_count integer DEFAULT 0,
+  pages_per_day integer DEFAULT 0,
+  supplies jsonb DEFAULT '[]'::jsonb,
+  last_seen timestamptz DEFAULT now(),
+  discovered_at timestamptz DEFAULT now(),
+  created_by uuid,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Enable RLS
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.printers ENABLE ROW LEVEL SECURITY;
 
 -- Cargos padrão
 INSERT INTO public.roles (name, description, is_system) VALUES
