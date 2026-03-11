@@ -53,6 +53,75 @@ export type Database = {
         }
         Relationships: []
       }
+      printers: {
+        Row: {
+          brand: string
+          created_at: string
+          created_by: string | null
+          discovered_at: string | null
+          firmware: string | null
+          hostname: string | null
+          id: string
+          ip: string
+          last_seen: string | null
+          location: string | null
+          mac: string | null
+          model: string
+          page_count: number | null
+          pages_per_day: number | null
+          sector: string | null
+          serial: string | null
+          status: string
+          supplies: Json | null
+          updated_at: string
+          uptime: string | null
+        }
+        Insert: {
+          brand?: string
+          created_at?: string
+          created_by?: string | null
+          discovered_at?: string | null
+          firmware?: string | null
+          hostname?: string | null
+          id?: string
+          ip: string
+          last_seen?: string | null
+          location?: string | null
+          mac?: string | null
+          model?: string
+          page_count?: number | null
+          pages_per_day?: number | null
+          sector?: string | null
+          serial?: string | null
+          status?: string
+          supplies?: Json | null
+          updated_at?: string
+          uptime?: string | null
+        }
+        Update: {
+          brand?: string
+          created_at?: string
+          created_by?: string | null
+          discovered_at?: string | null
+          firmware?: string | null
+          hostname?: string | null
+          id?: string
+          ip?: string
+          last_seen?: string | null
+          location?: string | null
+          mac?: string | null
+          model?: string
+          page_count?: number | null
+          pages_per_day?: number | null
+          sector?: string | null
+          serial?: string | null
+          status?: string
+          supplies?: Json | null
+          updated_at?: string
+          uptime?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
