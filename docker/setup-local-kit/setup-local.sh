@@ -30,7 +30,7 @@ PROJECT_NAME=$(basename "$(pwd)" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-
 DB_PORT=54320
 API_PORT=54321
 APP_PORT=3001
-HOST_IP="localhost"
+HOST_IP=""
 POSTGRES_PASSWORD=""
 JWT_SECRET=""
 SKIP_DOCKER=false
@@ -53,6 +53,18 @@ while [[ $# -gt 0 ]]; do
     *) echo -e "${RED}Opção desconhecida: $1${NC}"; exit 1 ;;
   esac
 done
+
+# Auto-detectar IP da máquina se não fornecido
+if [ -z "$HOST_IP" ]; then
+  HOST_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+  if [ -z "$HOST_IP" ]; then
+    HOST_IP=$(ip -4 addr show scope global | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+  fi
+  if [ -z "$HOST_IP" ]; then
+    HOST_IP="localhost"
+  fi
+  echo -e "${GREEN}✓ IP detectado automaticamente: ${HOST_IP}${NC}"
+fi
 
 # Gerar senha se não fornecida
 if [ -z "$POSTGRES_PASSWORD" ]; then
