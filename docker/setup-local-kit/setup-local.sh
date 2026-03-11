@@ -413,13 +413,12 @@ services:
       JWT_EXP: 3600
     volumes:
       - ${PROJECT_NAME}-db-data:/var/lib/postgresql/data
-      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/00-init-roles.sql:ro
     healthcheck:
       test: pg_isready -U supabase_admin -d postgres -h localhost
       interval: 5s
       timeout: 10s
-      retries: 20
-      start_period: 30s
+      retries: 30
+      start_period: 60s
 
   # ============================================
   # Supabase Auth (GoTrue) - Autenticação
@@ -598,14 +597,51 @@ if [ "$SKIP_DOCKER" = false ]; then
   if [ $RETRIES -lt $MAX_RETRIES ]; then
     echo -e "${GREEN}✓ Banco pronto!${NC}"
     
-    # Rodar init-db.sql manualmente caso docker-entrypoint não tenha rodado
-    # (acontece se o volume já existia de uma instalação anterior)
-    echo -e "${YELLOW}Garantindo roles do banco...${NC}"
-    docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres < docker/init-db.sql 2>/dev/null || true
-    echo -e "${GREEN}✓ Roles verificados${NC}"
+    # ============================================================
+    # Setup completo dos roles via docker exec (pós-init)
+    # A imagem supabase/postgres já cria: anon, authenticated,
+    # service_role, supabase_admin, supabase_auth_admin, etc.
+    # Aqui garantimos authenticator + senha + grants
+    # ============================================================
+    echo -e "${YELLOW}Configurando roles e permissões do banco...${NC}"
+    docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres <<ROLES_SQL
+-- Authenticator (PostgREST connection role)
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'authenticator') THEN
+    CREATE ROLE authenticator NOINHERIT LOGIN PASSWORD '${POSTGRES_PASSWORD}';
+  END IF;
+END
+\$\$;
+ALTER ROLE authenticator PASSWORD '${POSTGRES_PASSWORD}';
+
+-- Garantir senha do supabase_auth_admin para GoTrue
+ALTER ROLE supabase_auth_admin PASSWORD '${POSTGRES_PASSWORD}';
+
+-- Grants
+GRANT anon TO authenticator;
+GRANT authenticated TO authenticator;
+GRANT service_role TO authenticator;
+GRANT ALL ON SCHEMA public TO supabase_auth_admin;
+GRANT CREATE ON SCHEMA public TO supabase_auth_admin;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO supabase_auth_admin;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO supabase_auth_admin;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+
+-- Extensões
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" SCHEMA public;
+CREATE EXTENSION IF NOT EXISTS "pgcrypto" SCHEMA public;
+ROLES_SQL
+    echo -e "${GREEN}✓ Roles e permissões configurados${NC}"
   fi
-  
-  # Aplicar migrations se existirem (via docker exec, sem precisar do supabase CLI)
+
+  # Aplicar migrations se existirem
   if [ -d "supabase/migrations" ] && [ "$(ls -A supabase/migrations 2>/dev/null)" ]; then
     echo ""
     echo -e "${YELLOW}Aplicando migrations do banco...${NC}"
@@ -631,26 +667,7 @@ if [ "$SKIP_DOCKER" = false ]; then
   # ============================================================
   # Criar tabelas da aplicação e usuário DEV
   # ============================================================
-  echo ""
-  echo -e "${YELLOW}Configurando grants dos roles...${NC}"
-  docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres <<'GRANTS_SQL'
--- Grants para roles do PostgREST (roles já criados pela imagem)
-GRANT anon TO authenticator;
-GRANT authenticated TO authenticator;
-GRANT service_role TO authenticator;
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO supabase_auth_admin;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO supabase_auth_admin;
-GRANTS_SQL
-  echo -e "${GREEN}✓ Grants aplicados${NC}"
 
-  echo ""
   echo -e "${YELLOW}Criando tabelas da aplicação e funções...${NC}"
   docker exec -i ${PROJECT_NAME}-db psql -U supabase_admin -h localhost -d postgres <<'APP_SQL'
 -- Tabelas da aplicação
